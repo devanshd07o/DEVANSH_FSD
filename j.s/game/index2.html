@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#69d7ff">
+  <title>Chomp Dash</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root { --safe-top: env(safe-area-inset-top, 0px); }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #69d7ff;
+      font-family: "Trebuchet MS", "Arial Rounded MT Bold", Arial, sans-serif;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100dvh;
+      cursor: pointer;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" tabindex="0" role="img" aria-keyshortcuts="Space" aria-label="Chomp Dash. Press Space or tap to jump."></canvas>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const skyCanvas = document.createElement("canvas");
+      const skyCtx = skyCanvas.getContext("2d");
+
+      // Gameplay tuning: edit this block to quickly change pace and difficulty.
+      const CONFIG = {
+        INITIAL_SPEED: 300,
+        SPEED_STEP: 34,
+        SPEED_UP_EVERY: 15,
+        MAX_SPEED: 640,
+        START_SPAWN_MIN: 520,
+        START_SPAWN_MAX: 760,
+        SPAWN_SHRINK_PER_LEVEL: 34,
+        MIN_SPAWN_DISTANCE: 335,
+        FOOD_SPAWN_MIN: 265,
+        FOOD_SPAWN_MAX: 405,
+        GRAVITY: 1900,
+        FALL_GRAVITY_MULTIPLIER: 1.32,
+        JUMP_CUT_MULTIPLIER: 2.15,
+        MAX_FALL_SPEED: 1180,
+        JUMP_VELOCITY: -735,
+        JUMP_BUFFER: 0.14,
+        JUMP_MIN_HOLD: 0.09,
+        COYOTE_TIME: 0.11,
+        FIXED_STEP: 1 / 120,
+        MAX_FRAME_TIME: 0.05,
+        FOOD_SCORE: 90,
+        MAX_COMBO: 12,
+        MAX_GROWTH: 1.28,
+        SCORE_PER_PIXEL: 0.045
+      };
+
+      const COLORS = {
+        skyTop: "#3d91d8",
+        skyBottom: "#d8edf3",
+        sun: "#fff1bd",
+        farHill: "#75959d",
+        nearHill: "#4f7961",
+        grass: "#39834b",
+        grassLight: "#77b75b",
+        dirt: "#8b5d3d",
+        dirtDark: "#543a31",
+        abyss: "#171b27",
+        ink: "#172938",
+        cream: "#fff8e8",
+        blob: "#ff5a87",
+        blobDark: "#a91f53",
+        yellow: "#ffd15a",
+        white: "#ffffff"
+      };
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+      let groundY = 0;
+      let baseRadius = 30;
+      let safeTop = 0;
+      let lastTime = performance.now();
+      let accumulator = 0;
+      let state = "ready";
+      let elapsed = 0;
+      let distance = 0;
+      let bonusScore = 0;
+      let score = 0;
+      let highScore = loadHighScore();
+      let speed = CONFIG.INITIAL_SPEED;
+      let difficultyLevel = 0;
+      let obstacleDistance = 520;
+      let foodDistance = 320;
+      let combo = 1;
+      let foodsEaten = 0;
+      let newBest = false;
+      let shake = 0;
+      let deathTimer = 0;
+      let worldOffset = 0;
+      let audioContext = null;
+
+      const obstacles = [];
+      const foods = [];
+      const particles = [];
+      const popups = [];
+      const clouds = [];
+
+      const player = {
+        x: 120,
+        y: 0,
+        vy: 0,
+        rotation: 0,
+        grounded: true,
+        coyote: 0,
+        scaleX: 1,
+        scaleY: 1,
+        growth: 1,
+        targetGrowth: 1,
+        landBounce: 0,
+        blink: 0,
+        blinkWait: 2,
+        jumpBuffer: 0,
+        jumpHeld: false,
+        airTime: 0
+      };
+
+      function loadHighScore() {
+        try {
+          return Number(localStorage.getItem("chompDashHighScore")) || 0;
+        } catch (error) {
+          return 0;
+        }
+      }
+
+      function saveHighScore() {
+        try {
+          localStorage.setItem("chompDashHighScore", String(highScore));
+        } catch (error) {
+          // The game remains playable when storage is unavailable.
+        }
+      }
+
+      function resize() {
+        const previousGroundY = groundY;
+        const previousRadius = baseRadius;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        safeTop = Number.parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--safe-top")
+        ) || 0;
+
+        groundY = Math.round(height * (width < 600 ? 0.76 : 0.79));
+        baseRadius = clamp(Math.min(width, height) * 0.055, 24, 34);
+        player.x = clamp(width * 0.2, 82, 175);
+
+        if (state === "ready") {
+          player.y = groundY - baseRadius;
+        } else if (player.grounded) {
+          player.y = groundY - baseRadius * player.growth;
+        } else if (previousGroundY) {
+          player.y += groundY - previousGroundY;
+          player.vy *= baseRadius / previousRadius;
+        }
+
+        // Keep airborne items aligned with the platform after an orientation change.
+        if (previousGroundY) {
+          for (const obstacle of obstacles) {
+            if (obstacle.type === "bird") obstacle.y = groundY - baseRadius * 3.05;
+          }
+          for (const food of foods) {
+            const oldHeight = previousGroundY - food.baseY;
+            food.baseY = groundY - oldHeight * (baseRadius / previousRadius);
+          }
+        }
+
+        createClouds();
+        renderStaticSky();
+      }
+
+      function createClouds() {
+        clouds.length = 0;
+        const count = Math.max(4, Math.ceil(width / 260));
+        for (let i = 0; i < count; i++) {
+          clouds.push({
+            x: (i / count) * (width + 240) + random(-50, 80),
+            y: random(height * 0.09, height * 0.34),
+            size: random(0.65, 1.15),
+            speed: random(8, 18)
+          });
+        }
+      }
+
+      function resetGame() {
+        elapsed = 0;
+        distance = 0;
+        bonusScore = 0;
+        score = 0;
+        speed = CONFIG.INITIAL_SPEED;
+        difficultyLevel = 0;
+        obstacleDistance = 580;
+        foodDistance = 300;
+        combo = 1;
+        foodsEaten = 0;
+        newBest = false;
+        shake = 0;
+        deathTimer = 0;
+        worldOffset = 0;
+        obstacles.length = 0;
+        foods.length = 0;
+        particles.length = 0;
+        popups.length = 0;
+
+        player.y = groundY - baseRadius;
+        player.vy = 0;
+        player.rotation = 0;
+        player.grounded = true;
+        player.coyote = CONFIG.COYOTE_TIME;
+        player.scaleX = 1;
+        player.scaleY = 1;
+        player.growth = 1;
+        player.targetGrowth = 1;
+        player.landBounce = 0;
+        player.jumpBuffer = 0;
+        player.jumpHeld = false;
+        player.airTime = 0;
+      }
+
+      function startGame() {
+        resetGame();
+        state = "playing";
+      }
+
+      function isJumpKey(event) {
+        return event.code === "Space" || event.key === " " || event.key === "Spacebar" || event.keyCode === 32;
+      }
+
+      function handleJumpPress(event) {
+        if (event && event.type === "keydown") {
+          if (!isJumpKey(event)) return;
+          event.preventDefault();
+          if (event.repeat) return;
+        } else if (event && event.cancelable) {
+          event.preventDefault();
+        }
+
+        initAudio();
+
+        if (event && event.type === "pointerdown") canvas.focus();
+
+        if (state === "ready" || state === "gameover") {
+          startGame();
+        }
+
+        if (state !== "playing") return;
+        player.jumpHeld = true;
+
+        // Grounded jumps execute immediately; the buffer only waits for a valid landing window.
+        if (player.grounded || player.coyote > 0) performJump();
+        else player.jumpBuffer = CONFIG.JUMP_BUFFER;
+      }
+
+      function handleJumpRelease(event) {
+        if (event && event.type === "keyup" && !isJumpKey(event)) return;
+        if (event && event.cancelable) event.preventDefault();
+        player.jumpHeld = false;
+      }
+
+      function performJump() {
+        player.vy = CONFIG.JUMP_VELOCITY;
+        player.grounded = false;
+        player.coyote = 0;
+        player.jumpBuffer = 0;
+        player.airTime = 0;
+        player.scaleX = 0.84;
+        player.scaleY = 1.18;
+        playJumpSound();
+        burst(player.x - baseRadius * 0.4, groundY - 3, COLORS.cream, 6, 105, false);
+      }
+
+      function initAudio() {
+        try {
+          if (!audioContext) {
+            const AudioCtor = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtor) audioContext = new AudioCtor();
+          }
+          if (audioContext && audioContext.state === "suspended") audioContext.resume();
+        } catch (error) {
+          audioContext = null;
+        }
+      }
+
+      function tone(startFrequency, endFrequency, duration, type, volume) {
+        if (!audioContext) return;
+        try {
+          const now = audioContext.currentTime;
+          const oscillator = audioContext.createOscillator();
+          const gain = audioContext.createGain();
+          oscillator.type = type;
+          oscillator.frequency.setValueAtTime(startFrequency, now);
+          oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), now + duration);
+          gain.gain.setValueAtTime(volume, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+          oscillator.connect(gain).connect(audioContext.destination);
+          oscillator.start(now);
+          oscillator.stop(now + duration);
+        } catch (error) {
+          audioContext = null;
+        }
+      }
+
+      function playJumpSound() {
+        tone(260, 520, 0.11, "sine", 0.09);
+      }
+
+      function playEatSound() {
+        tone(720, 420, 0.08, "square", 0.055);
+        setTimeout(() => tone(500, 780, 0.07, "sine", 0.045), 35);
+      }
+
+      function playDeathSound() {
+        tone(135, 42, 0.32, "sawtooth", 0.12);
+      }
+
+      function update(dt) {
+        updateClouds(dt);
+        updateAmbientPlayer(dt);
+
+        if (state === "playing") updatePlaying(dt);
+        if (state === "dying") updateDying(dt);
+
+        updateParticles(dt);
+        updatePopups(dt);
+        shake *= Math.pow(0.025, dt);
+      }
+
+      function updatePlaying(dt) {
+        elapsed += dt;
+        distance += speed * dt;
+        worldOffset += speed * dt;
+
+        const nextLevel = Math.floor(elapsed / CONFIG.SPEED_UP_EVERY);
+        if (nextLevel !== difficultyLevel) {
+          difficultyLevel = nextLevel;
+          popups.push({
+            x: width / 2,
+            y: height * 0.24,
+            text: "FASTER!",
+            color: COLORS.yellow,
+            life: 1.05,
+            maxLife: 1.05,
+            size: 24
+          });
+        }
+        speed = Math.min(CONFIG.MAX_SPEED, CONFIG.INITIAL_SPEED + difficultyLevel * CONFIG.SPEED_STEP);
+
+        obstacleDistance -= speed * dt;
+        foodDistance -= speed * dt;
+        if (obstacleDistance <= 0) spawnObstacle();
+        if (foodDistance <= 0) spawnFood();
+
+        // Resolve input and body motion before collision tests so a Space press is immediate.
+        updatePlayerPhysics(dt);
+        if (state !== "playing") return;
+        updateObstacles(dt);
+        if (state !== "playing") return;
+        updateFoods(dt);
+
+        score = Math.floor(distance * CONFIG.SCORE_PER_PIXEL + bonusScore);
+        player.targetGrowth = Math.min(
+          CONFIG.MAX_GROWTH,
+          1 + score / 24000 + foodsEaten * 0.009
+        );
+        player.growth = lerp(player.growth, player.targetGrowth, 1 - Math.pow(0.001, dt));
+      }
+
+      function updateAmbientPlayer(dt) {
+        player.blinkWait -= dt;
+        if (player.blinkWait <= 0) {
+          player.blink = 0.13;
+          player.blinkWait = random(1.8, 4.1);
+        }
+        player.blink = Math.max(0, player.blink - dt);
+        player.landBounce = Math.max(0, player.landBounce - dt);
+
+        const response = 1 - Math.pow(0.0001, dt);
+        let targetX = 1;
+        let targetY = 1;
+
+        if (state === "playing" && !player.grounded) {
+          if (player.vy < -80) {
+            targetX = 0.9;
+            targetY = 1.1;
+          } else if (player.vy > 120) {
+            targetX = 1.08;
+            targetY = 0.93;
+          }
+        }
+
+        if (player.landBounce > 0) {
+          targetX = 1.2;
+          targetY = 0.78;
+        }
+
+        player.scaleX = lerp(player.scaleX, targetX, response);
+        player.scaleY = lerp(player.scaleY, targetY, response);
+        if (state === "playing") {
+          const velocityTilt = clamp(player.vy / 3200, -0.12, 0.16);
+          player.rotation = lerp(player.rotation, velocityTilt, 1 - Math.pow(0.002, dt));
+        } else if (state === "ready") {
+          player.rotation = lerp(player.rotation, 0, response);
+        }
+      }
+
+      function updatePlayerPhysics(dt) {
+        const radius = baseRadius * player.growth;
+        const wasGrounded = player.grounded;
+        const supported = !isOverGap(player.x, radius * 0.48);
+        const previousY = player.y;
+
+        player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
+
+        if (player.grounded && !supported) {
+          player.grounded = false;
+          player.coyote = CONFIG.COYOTE_TIME;
+        }
+
+        if (player.jumpBuffer > 0 && (player.grounded || player.coyote > 0)) performJump();
+
+        if (!player.grounded || !supported) {
+          player.airTime += dt;
+          let gravity = CONFIG.GRAVITY;
+          if (player.vy > 0) gravity *= CONFIG.FALL_GRAVITY_MULTIPLIER;
+          if (!player.jumpHeld && player.vy < 0 && player.airTime > CONFIG.JUMP_MIN_HOLD) {
+            gravity *= CONFIG.JUMP_CUT_MULTIPLIER;
+          }
+          player.vy = Math.min(CONFIG.MAX_FALL_SPEED, player.vy + gravity * dt);
+          player.y += player.vy * dt;
+        }
+
+        if (!player.grounded) player.coyote = Math.max(0, player.coyote - dt);
+
+        const crossedPlatform = previousY + radius <= groundY + 2 && player.y + radius >= groundY;
+        if (supported && player.vy >= 0 && crossedPlatform) {
+          player.y = groundY - radius;
+          player.vy = 0;
+          player.grounded = true;
+          player.coyote = CONFIG.COYOTE_TIME;
+          player.airTime = 0;
+          if (!wasGrounded) {
+            player.landBounce = 0.1;
+            burst(player.x, groundY - 2, COLORS.cream, 7, 105, false);
+          }
+        }
+
+        if (player.y - radius > height + 24) endRun(true);
+      }
+
+      function spawnObstacle() {
+        const x = width + 80;
+        const roll = Math.random();
+        let obstacle;
+
+        if (roll < 0.42) {
+          const spikeCount = Math.random() < 0.3 + difficultyLevel * 0.04 ? 2 : 1;
+          obstacle = {
+            type: "spike",
+            x,
+            width: spikeCount * 31,
+            height: 31,
+            count: spikeCount
+          };
+        } else if (roll < 0.72) {
+          obstacle = {
+            type: "gap",
+            x,
+            width: random(112, Math.min(168, 135 + difficultyLevel * 5))
+          };
+        } else {
+          obstacle = {
+            type: "bird",
+            x,
+            width: 62,
+            height: 34,
+            y: groundY - baseRadius * 3.05,
+            phase: random(0, Math.PI * 2)
+          };
+        }
+
+        obstacles.push(obstacle);
+
+        const min = Math.max(
+          CONFIG.MIN_SPAWN_DISTANCE,
+          CONFIG.START_SPAWN_MIN - difficultyLevel * CONFIG.SPAWN_SHRINK_PER_LEVEL
+        );
+        const max = Math.max(
+          min + 80,
+          CONFIG.START_SPAWN_MAX - difficultyLevel * CONFIG.SPAWN_SHRINK_PER_LEVEL
+        );
+        obstacleDistance = random(min, max);
+      }
+
+      function spawnFood() {
+        let x = width + 70;
+        const nearbyBird = obstacles.find(item => item.type === "bird" && Math.abs(item.x - x) < 155);
+        if (nearbyBird) x += 175;
+
+        const type = Math.random() < 0.56 ? "fruit" : "donut";
+        foods.push({
+          type,
+          x,
+          baseY: groundY - random(baseRadius * 2.7, baseRadius * 3.65),
+          y: 0,
+          radius: type === "fruit" ? 15 : 17,
+          phase: random(0, Math.PI * 2),
+          rotation: random(-0.2, 0.2),
+          collected: false
+        });
+
+        foodDistance = random(CONFIG.FOOD_SPAWN_MIN, CONFIG.FOOD_SPAWN_MAX);
+      }
+
+      function updateObstacles(dt) {
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+          const obstacle = obstacles[i];
+          obstacle.x -= speed * dt;
+          if (obstacle.type === "bird") obstacle.phase += dt * 9;
+
+          if (obstacle.type !== "gap" && collidesWithObstacle(obstacle)) {
+            endRun(false);
+            return;
+          }
+
+          if (obstacle.x + obstacle.width < -80) obstacles.splice(i, 1);
+        }
+      }
+
+      function updateFoods(dt) {
+        const radius = baseRadius * player.growth * 0.78;
+        for (let i = foods.length - 1; i >= 0; i--) {
+          const food = foods[i];
+          food.x -= speed * dt;
+          food.phase += dt * 4.2;
+          food.rotation += dt * (food.type === "donut" ? 0.8 : 0.25);
+          food.y = food.baseY + Math.sin(food.phase) * 7;
+
+          const dx = food.x - player.x;
+          const dy = food.y - player.y;
+          if (dx * dx + dy * dy < Math.pow(radius + food.radius, 2)) {
+            eatFood(food);
+            foods.splice(i, 1);
+            continue;
+          }
+
+          if (food.x + food.radius < player.x - radius) {
+            if (combo > 1) {
+              popups.push({
+                x: player.x,
+                y: player.y - radius - 24,
+                text: "COMBO LOST",
+                color: "#ffffff",
+                life: 0.65,
+                maxLife: 0.65,
+                size: 14
+              });
+            }
+            combo = 1;
+            foods.splice(i, 1);
+          }
+        }
+      }
+
+      function eatFood(food) {
+        const gain = CONFIG.FOOD_SCORE * combo;
+        bonusScore += gain;
+        foodsEaten++;
+        combo = Math.min(CONFIG.MAX_COMBO, combo + 1);
+        shake = Math.max(shake, 2.5);
+        playEatSound();
+
+        const color = food.type === "fruit" ? "#ff5b68" : COLORS.yellow;
+        burst(food.x, food.y, color, 14, 180, true);
+        popups.push({
+          x: food.x,
+          y: food.y - 12,
+          text: "+" + gain + "  COMBO x" + combo,
+          color: COLORS.yellow,
+          life: 0.9,
+          maxLife: 0.9,
+          size: 19
+        });
+      }
+
+      function collidesWithObstacle(obstacle) {
+        const radius = baseRadius * player.growth * 0.72;
+        const px = player.x;
+        const py = player.y;
+
+        if (obstacle.type === "spike") {
+          for (let i = 0; i < obstacle.count; i++) {
+            const left = obstacle.x + i * 31 + 5;
+            const right = left + 21;
+            const top = groundY - obstacle.height + 7;
+            if (circleRectCollision(px, py, radius, left, top, right - left, obstacle.height - 7)) return true;
+          }
+        }
+
+        if (obstacle.type === "bird") {
+          const birdY = obstacle.y + Math.sin(obstacle.phase * 0.7) * 4;
+          const dx = (px - (obstacle.x + obstacle.width / 2)) / (radius + 25);
+          const dy = (py - birdY) / (radius + 15);
+          return dx * dx + dy * dy < 1;
+        }
+
+        return false;
+      }
+
+      function circleRectCollision(cx, cy, radius, rx, ry, rw, rh) {
+        const nearestX = clamp(cx, rx, rx + rw);
+        const nearestY = clamp(cy, ry, ry + rh);
+        const dx = cx - nearestX;
+        const dy = cy - nearestY;
+        return dx * dx + dy * dy < radius * radius;
+      }
+
+      function isOverGap(x, footWidth) {
+        return obstacles.some(obstacle =>
+          obstacle.type === "gap" &&
+          x + footWidth > obstacle.x + 5 &&
+          x - footWidth < obstacle.x + obstacle.width - 5
+        );
+      }
+
+      function endRun(fell) {
+        if (state !== "playing") return;
+        state = "dying";
+        deathTimer = 0.62;
+        shake = fell ? 9 : 17;
+        player.vy = fell ? player.vy : -260;
+        player.grounded = false;
+        playDeathSound();
+
+        score = Math.floor(distance * CONFIG.SCORE_PER_PIXEL + bonusScore);
+        newBest = score > highScore;
+        if (score > highScore) {
+          highScore = score;
+          saveHighScore();
+        }
+      }
+
+      function updateDying(dt) {
+        deathTimer -= dt;
+        player.vy += CONFIG.GRAVITY * 0.65 * dt;
+        player.y += player.vy * dt;
+        player.rotation += dt * 5.5;
+        if (deathTimer <= 0) state = "gameover";
+      }
+
+      function updateClouds(dt) {
+        const runBoost = state === "playing" ? speed * 0.025 : 0;
+        for (const cloud of clouds) {
+          cloud.x -= (cloud.speed + runBoost) * dt;
+          if (cloud.x < -130 * cloud.size) {
+            cloud.x = width + random(50, 180);
+            cloud.y = random(height * 0.08, height * 0.34);
+          }
+        }
+      }
+
+      function burst(x, y, color, count, force, round) {
+        for (let i = 0; i < count; i++) {
+          const angle = random(-Math.PI, 0);
+          const velocity = random(force * 0.4, force);
+          particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * velocity + random(-30, 30),
+            vy: Math.sin(angle) * velocity,
+            gravity: random(260, 520),
+            size: random(3, 7),
+            color,
+            life: random(0.35, 0.7),
+            maxLife: 0.7,
+            rotation: random(0, Math.PI),
+            spin: random(-8, 8),
+            round
+          });
+        }
+      }
+
+      function updateParticles(dt) {
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const particle = particles[i];
+          particle.life -= dt;
+          particle.vy += particle.gravity * dt;
+          particle.x += particle.vx * dt;
+          particle.y += particle.vy * dt;
+          particle.rotation += particle.spin * dt;
+          if (particle.life <= 0) particles.splice(i, 1);
+        }
+      }
+
+      function updatePopups(dt) {
+        for (let i = popups.length - 1; i >= 0; i--) {
+          popups[i].life -= dt;
+          popups[i].y -= 35 * dt;
+          if (popups[i].life <= 0) popups.splice(i, 1);
+        }
+      }
+
+      function draw() {
+        ctx.save();
+        if (shake > 0.2) ctx.translate(random(-shake, shake), random(-shake, shake));
+
+        drawSky();
+        drawClouds();
+        drawHills();
+        drawGround();
+        drawFoods();
+        drawObstacles();
+        drawParticles();
+        drawPlayer();
+        drawPopups();
+        ctx.restore();
+
+        if (state === "playing" || state === "dying") drawHUD();
+        if (state === "ready") drawReadyScreen();
+        if (state === "gameover") drawGameOverScreen();
+      }
+
+      function renderStaticSky() {
+        skyCanvas.width = Math.round(width * dpr);
+        skyCanvas.height = Math.round(height * dpr);
+        skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const gradient = skyCtx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, "#287fc4");
+        gradient.addColorStop(0.5, "#65aed9");
+        gradient.addColorStop(0.82, "#b9d9df");
+        gradient.addColorStop(1, "#dce9e4");
+        skyCtx.fillStyle = gradient;
+        skyCtx.fillRect(0, 0, width, height);
+
+        const sunX = width * 0.82;
+        const sunY = height * 0.15;
+        const sunRadius = clamp(width * 0.042, 28, 50);
+        const glow = skyCtx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunRadius * 4.2);
+        glow.addColorStop(0, "rgba(255,250,222,1)");
+        glow.addColorStop(0.18, "rgba(255,240,177,0.72)");
+        glow.addColorStop(1, "rgba(255,240,177,0)");
+        skyCtx.fillStyle = glow;
+        skyCtx.beginPath();
+        skyCtx.arc(sunX, sunY, sunRadius * 4.2, 0, Math.PI * 2);
+        skyCtx.fill();
+
+        skyCtx.fillStyle = "#fff4c6";
+        skyCtx.beginPath();
+        skyCtx.arc(sunX, sunY, sunRadius, 0, Math.PI * 2);
+        skyCtx.fill();
+
+        const haze = skyCtx.createLinearGradient(0, groundY - 220, 0, groundY + 12);
+        haze.addColorStop(0, "rgba(244,249,242,0)");
+        haze.addColorStop(1, "rgba(238,245,229,0.52)");
+        skyCtx.fillStyle = haze;
+        skyCtx.fillRect(0, groundY - 220, width, 232);
+      }
+
+      function drawSky() {
+        ctx.drawImage(skyCanvas, 0, 0, skyCanvas.width, skyCanvas.height, -30, -30, width + 60, height + 60);
+      }
+
+      function drawClouds() {
+        for (const cloud of clouds) {
+          ctx.save();
+          ctx.translate(cloud.x, cloud.y);
+          ctx.scale(cloud.size, cloud.size);
+          ctx.shadowColor = "rgba(52,91,119,0.18)";
+          ctx.shadowBlur = 14;
+          ctx.shadowOffsetY = 8;
+          const cloudGradient = ctx.createLinearGradient(0, -28, 0, 35);
+          cloudGradient.addColorStop(0, "rgba(255,255,255,0.96)");
+          cloudGradient.addColorStop(0.7, "rgba(238,246,248,0.92)");
+          cloudGradient.addColorStop(1, "rgba(196,220,229,0.82)");
+          ctx.fillStyle = cloudGradient;
+          ctx.beginPath();
+          ctx.moveTo(-18, 24);
+          ctx.bezierCurveTo(-28, 5, -12, -12, 6, -9);
+          ctx.bezierCurveTo(12, -34, 48, -38, 57, -11);
+          ctx.bezierCurveTo(78, -13, 91, 3, 84, 21);
+          ctx.bezierCurveTo(66, 34, 2, 34, -18, 24);
+          ctx.closePath();
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = "rgba(255,255,255,0.38)";
+          ctx.beginPath();
+          ctx.ellipse(31, -13, 24, 11, -0.1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      function drawHills() {
+        drawTerrainLayer("#839ba4", "#596f74", groundY + 2, 150, worldOffset * 0.055, 0.0042, 0.7);
+        drawHorizonMist(0.17);
+        drawTerrainLayer("#688b72", "#405e4c", groundY + 13, 105, worldOffset * 0.12, 0.0062, 2.1);
+        drawTreeLine();
+        drawTerrainLayer("#4f7b57", "#2d5140", groundY + 22, 78, worldOffset * 0.21, 0.0085, 4.3);
+      }
+
+      function terrainHeight(worldX, rise, frequency, seed) {
+        const broad = Math.sin(worldX * frequency + seed) * 0.34;
+        const medium = Math.sin(worldX * frequency * 2.17 + seed * 1.9) * 0.16;
+        const detail = Math.sin(worldX * frequency * 4.63 + seed * 0.7) * 0.055;
+        return rise * (0.54 + broad + medium + detail);
+      }
+
+      function drawTerrainLayer(topColor, bottomColor, baseline, rise, offset, frequency, seed) {
+        const gradient = ctx.createLinearGradient(0, baseline - rise, 0, baseline + 26);
+        gradient.addColorStop(0, topColor);
+        gradient.addColorStop(1, bottomColor);
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(-24, baseline);
+        for (let x = -24; x <= width + 24; x += 12) {
+          const ridgeY = baseline - terrainHeight(x + offset, rise, frequency, seed);
+          ctx.lineTo(x, ridgeY);
+        }
+        ctx.lineTo(width + 24, groundY + 52);
+        ctx.lineTo(-24, groundY + 52);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(229,240,234,0.16)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let x = -24; x <= width + 24; x += 12) {
+          const ridgeY = baseline - terrainHeight(x + offset, rise, frequency, seed);
+          if (x === -24) ctx.moveTo(x, ridgeY);
+          else ctx.lineTo(x, ridgeY);
+        }
+        ctx.stroke();
+      }
+
+      function drawHorizonMist(alpha) {
+        const mist = ctx.createLinearGradient(0, groundY - 105, 0, groundY + 15);
+        mist.addColorStop(0, "rgba(231,240,231,0)");
+        mist.addColorStop(0.55, "rgba(231,240,231," + alpha + ")");
+        mist.addColorStop(1, "rgba(231,240,231,0)");
+        ctx.fillStyle = mist;
+        ctx.fillRect(0, groundY - 105, width, 120);
+      }
+
+      function drawTreeLine() {
+        const spacing = 46;
+        const offset = -(worldOffset * 0.17 % spacing);
+        ctx.fillStyle = "rgba(39,77,56,0.7)";
+        for (let x = offset - spacing; x < width + spacing; x += spacing) {
+          const treeHeight = 28 + (Math.sin((x + worldOffset * 0.17) * 0.19) + 1) * 10;
+          const base = groundY + 10;
+          ctx.beginPath();
+          ctx.moveTo(x, base);
+          ctx.lineTo(x + 10, base - treeHeight * 0.58);
+          ctx.lineTo(x + 5, base - treeHeight * 0.58);
+          ctx.lineTo(x + 15, base - treeHeight);
+          ctx.lineTo(x + 25, base - treeHeight * 0.58);
+          ctx.lineTo(x + 20, base - treeHeight * 0.58);
+          ctx.lineTo(x + 31, base);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      function drawGround() {
+        const visibleGaps = obstacles
+          .filter(item => item.type === "gap" && item.x < width && item.x + item.width > 0)
+          .sort((a, b) => a.x - b.x);
+
+        let cursor = -30;
+        for (const gap of visibleGaps) {
+          drawGroundSegment(cursor, gap.x - cursor);
+          drawGap(gap);
+          cursor = gap.x + gap.width;
+        }
+        drawGroundSegment(cursor, width + 30 - cursor);
+      }
+
+      function drawGroundSegment(x, segmentWidth) {
+        if (segmentWidth <= 0) return;
+        const soilGradient = ctx.createLinearGradient(0, groundY, 0, height);
+        soilGradient.addColorStop(0, "#9a6943");
+        soilGradient.addColorStop(0.22, COLORS.dirt);
+        soilGradient.addColorStop(1, COLORS.dirtDark);
+        ctx.fillStyle = soilGradient;
+        ctx.fillRect(x, groundY, segmentWidth, height - groundY + 30);
+
+        const grassGradient = ctx.createLinearGradient(0, groundY - 12, 0, groundY + 8);
+        grassGradient.addColorStop(0, "#9bc866");
+        grassGradient.addColorStop(0.48, COLORS.grassLight);
+        grassGradient.addColorStop(1, COLORS.grass);
+        ctx.fillStyle = grassGradient;
+        ctx.fillRect(x, groundY - 9, segmentWidth, 17);
+
+        ctx.strokeStyle = "rgba(40,105,53,0.7)";
+        ctx.lineWidth = 1.4;
+        const bladeTile = 22;
+        const bladeOffset = -(worldOffset % bladeTile);
+        for (let bladeX = bladeOffset - bladeTile; bladeX < width + bladeTile; bladeX += bladeTile) {
+          if (bladeX > x + 3 && bladeX < x + segmentWidth - 3) {
+            ctx.beginPath();
+            ctx.moveTo(bladeX, groundY - 7);
+            ctx.lineTo(bladeX + 3, groundY - 15 - (Math.abs(bladeX) % 4));
+            ctx.moveTo(bladeX + 6, groundY - 7);
+            ctx.lineTo(bladeX + 3, groundY - 13);
+            ctx.stroke();
+          }
+        }
+
+        const tile = 78;
+        const offset = -(worldOffset % tile);
+        for (let dotX = offset - tile; dotX < width + tile; dotX += tile) {
+          if (dotX > x + 12 && dotX < x + segmentWidth - 10) {
+            ctx.fillStyle = "rgba(55,37,31,0.42)";
+            ctx.beginPath();
+            ctx.ellipse(dotX, groundY + 34, 8, 4, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "rgba(212,166,104,0.35)";
+            ctx.beginPath();
+            ctx.arc(dotX + 25, groundY + 67, 3.5, 0, Math.PI * 2);
+            ctx.arc(dotX - 18, groundY + 92, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      function drawGap(gap) {
+        const gradient = ctx.createLinearGradient(0, groundY, 0, height);
+        gradient.addColorStop(0, "#272538");
+        gradient.addColorStop(1, COLORS.abyss);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(gap.x, groundY - 1, gap.width, height - groundY + 31);
+
+        const wallGradient = ctx.createLinearGradient(gap.x, 0, gap.x + 16, 0);
+        wallGradient.addColorStop(0, "#3d2c28");
+        wallGradient.addColorStop(1, "#876044");
+        ctx.fillStyle = wallGradient;
+        ctx.beginPath();
+        ctx.moveTo(gap.x, groundY - 2);
+        ctx.lineTo(gap.x + 14, groundY + 15);
+        ctx.lineTo(gap.x + 8, height);
+        ctx.lineTo(gap.x, height);
+        ctx.closePath();
+        ctx.fill();
+
+        const rightWall = ctx.createLinearGradient(gap.x + gap.width - 16, 0, gap.x + gap.width, 0);
+        rightWall.addColorStop(0, "#876044");
+        rightWall.addColorStop(1, "#3d2c28");
+        ctx.fillStyle = rightWall;
+        ctx.beginPath();
+        ctx.moveTo(gap.x + gap.width, groundY - 2);
+        ctx.lineTo(gap.x + gap.width - 14, groundY + 15);
+        ctx.lineTo(gap.x + gap.width - 8, height);
+        ctx.lineTo(gap.x + gap.width, height);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.fillRect(gap.x + 13, groundY + 15, 2, Math.min(80, height - groundY));
+      }
+
+      function drawObstacles() {
+        for (const obstacle of obstacles) {
+          if (obstacle.type === "spike") drawSpikes(obstacle);
+          if (obstacle.type === "bird") drawBird(obstacle);
+        }
+      }
+
+      function drawSpikes(obstacle) {
+        for (let i = 0; i < obstacle.count; i++) {
+          const x = obstacle.x + i * 31;
+          const metal = ctx.createLinearGradient(x + 4, groundY, x + 24, groundY - obstacle.height);
+          metal.addColorStop(0, "#384a58");
+          metal.addColorStop(0.5, "#a9bac2");
+          metal.addColorStop(0.74, "#eef6f7");
+          metal.addColorStop(1, "#536977");
+          ctx.fillStyle = metal;
+          ctx.strokeStyle = "#273a47";
+          ctx.lineWidth = 2;
+          ctx.lineJoin = "round";
+          ctx.shadowColor = "rgba(18,30,38,0.28)";
+          ctx.shadowBlur = 5;
+          ctx.shadowOffsetX = 3;
+          ctx.shadowOffsetY = 4;
+          ctx.beginPath();
+          ctx.moveTo(x, groundY - 5);
+          ctx.lineTo(x + 15.5, groundY - obstacle.height);
+          ctx.lineTo(x + 31, groundY - 5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.shadowColor = "transparent";
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          ctx.fillStyle = "rgba(255,255,255,0.62)";
+          ctx.beginPath();
+          ctx.moveTo(x + 10, groundY - 11);
+          ctx.lineTo(x + 15.5, groundY - 26);
+          ctx.lineTo(x + 16, groundY - 12);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      function drawBird(obstacle) {
+        const y = obstacle.y + Math.sin(obstacle.phase * 0.7) * 4;
+        const flap = Math.sin(obstacle.phase) * 10;
+        ctx.save();
+        ctx.translate(obstacle.x + obstacle.width / 2, y);
+        ctx.shadowColor = "rgba(23,41,56,0.22)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 5;
+        const wingGradient = ctx.createLinearGradient(0, -24, 0, 16);
+        wingGradient.addColorStop(0, "#788da0");
+        wingGradient.addColorStop(1, "#354b5f");
+        ctx.fillStyle = wingGradient;
+        ctx.strokeStyle = "#263b4d";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-15, -2);
+        ctx.quadraticCurveTo(-29, -13 - flap, -38, -2 - flap * 0.55);
+        ctx.quadraticCurveTo(-26, 2, -10, 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(13, -3);
+        ctx.quadraticCurveTo(25, -14 - flap, 34, -2 - flap * 0.55);
+        ctx.quadraticCurveTo(25, 3, 10, 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        const bodyGradient = ctx.createRadialGradient(-8, -8, 2, 2, 3, 28);
+        bodyGradient.addColorStop(0, "#9cafbc");
+        bodyGradient.addColorStop(0.55, "#526b7e");
+        bodyGradient.addColorStop(1, "#263d51");
+        ctx.fillStyle = bodyGradient;
+        ctx.strokeStyle = "#203545";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 24, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = "#dfaa48";
+        ctx.beginPath();
+        ctx.moveTo(22, -2);
+        ctx.lineTo(36, 3);
+        ctx.lineTo(22, 7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        drawEye(-5, -6, 7, 2, 1);
+        drawEye(8, -6, 7, 2, 1);
+        ctx.restore();
+      }
+
+      function drawFoods() {
+        for (const food of foods) {
+          if (food.type === "fruit") drawFruit(food);
+          else drawDonut(food);
+        }
+      }
+
+      function drawFruit(food) {
+        ctx.save();
+        ctx.translate(food.x, food.y);
+        ctx.rotate(food.rotation);
+        ctx.shadowColor = "rgba(28,41,45,0.3)";
+        ctx.shadowBlur = 9;
+        ctx.shadowOffsetY = 5;
+        const appleGradient = ctx.createRadialGradient(-7, -8, 2, 0, 4, food.radius * 1.3);
+        appleGradient.addColorStop(0, "#ffaca0");
+        appleGradient.addColorStop(0.25, "#f45c5b");
+        appleGradient.addColorStop(0.75, "#b82738");
+        appleGradient.addColorStop(1, "#731e2c");
+        ctx.fillStyle = appleGradient;
+        ctx.strokeStyle = "rgba(82,27,35,0.75)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(-6, 2, food.radius * 0.72, 0, Math.PI * 2);
+        ctx.arc(6, 2, food.radius * 0.72, 0, Math.PI * 2);
+        ctx.lineTo(0, food.radius + 5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+        ctx.shadowOffsetY = 0;
+        ctx.fillStyle = "rgba(255,255,255,0.52)";
+        ctx.beginPath();
+        ctx.ellipse(-7, -5, 3.5, 6, -0.65, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#4f3826";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.quadraticCurveTo(0, -17, 7, -20);
+        ctx.stroke();
+        const leafGradient = ctx.createLinearGradient(2, -19, 13, -11);
+        leafGradient.addColorStop(0, "#8bc56e");
+        leafGradient.addColorStop(1, "#397a3f");
+        ctx.fillStyle = leafGradient;
+        ctx.beginPath();
+        ctx.ellipse(8, -15, 7, 3.5, -0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawDonut(food) {
+        ctx.save();
+        ctx.translate(food.x, food.y);
+        ctx.rotate(food.rotation);
+        ctx.shadowColor = "rgba(28,41,45,0.3)";
+        ctx.shadowBlur = 9;
+        ctx.shadowOffsetY = 5;
+        const doughGradient = ctx.createRadialGradient(-6, -8, 2, 1, 2, food.radius * 1.2);
+        doughGradient.addColorStop(0, "#f6c37e");
+        doughGradient.addColorStop(0.68, "#c77a36");
+        doughGradient.addColorStop(1, "#76401f");
+        ctx.fillStyle = doughGradient;
+        ctx.strokeStyle = "rgba(92,51,29,0.8)";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(0, 0, food.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+        ctx.shadowOffsetY = 0;
+        const icingGradient = ctx.createLinearGradient(0, -food.radius, 0, food.radius);
+        icingGradient.addColorStop(0, "#ffb6d0");
+        icingGradient.addColorStop(1, "#d74f83");
+        ctx.fillStyle = icingGradient;
+        ctx.beginPath();
+        ctx.arc(0, -2, food.radius - 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#8d552f";
+        ctx.strokeStyle = "rgba(82,43,25,0.8)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = COLORS.white;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 5; i++) {
+          const angle = i * 1.25;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(angle) * 9, Math.sin(angle) * 9 - 2);
+          ctx.lineTo(Math.cos(angle) * 13, Math.sin(angle) * 13 - 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawPlayer() {
+        const radius = baseRadius * player.growth;
+        const idle = state === "ready" ? Math.sin(performance.now() * 0.004) * 2 : 0;
+        const runWave = state === "playing" && player.grounded ? Math.sin(worldOffset * 0.075) : 0;
+        const runBob = state === "playing" && player.grounded ? -Math.abs(runWave) * 2.5 : 0;
+        const heightAboveGround = Math.max(0, groundY - (player.y + radius));
+        const shadowFade = 1 - clamp(heightAboveGround / 210, 0, 0.82);
+
+        if (!isOverGap(player.x, radius * 0.35)) {
+          ctx.save();
+          ctx.globalAlpha = 0.3 * shadowFade;
+          ctx.filter = "blur(4px)";
+          ctx.fillStyle = "#13232b";
+          ctx.beginPath();
+          ctx.ellipse(
+            player.x + 8,
+            groundY + 4,
+            radius * (0.84 - heightAboveGround / 520),
+            radius * 0.18 * shadowFade,
+            0,
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.translate(player.x, player.y + idle + runBob);
+        ctx.rotate(player.rotation);
+        ctx.scale(
+          player.scaleX * player.growth * (1 + runWave * 0.018),
+          player.scaleY * player.growth * (1 - runWave * 0.018)
+        );
+
+        const blobGradient = ctx.createRadialGradient(
+          -baseRadius * 0.38,
+          -baseRadius * 0.5,
+          baseRadius * 0.08,
+          baseRadius * 0.08,
+          baseRadius * 0.12,
+          baseRadius * 1.25
+        );
+        blobGradient.addColorStop(0, "#ffb4c8");
+        blobGradient.addColorStop(0.26, "#ff719b");
+        blobGradient.addColorStop(0.68, COLORS.blob);
+        blobGradient.addColorStop(1, COLORS.blobDark);
+        ctx.fillStyle = blobGradient;
+        ctx.strokeStyle = "rgba(83,24,52,0.82)";
+        ctx.lineWidth = 2.2;
+        ctx.shadowColor = "rgba(87,24,52,0.28)";
+        ctx.shadowBlur = 9;
+        ctx.shadowOffsetY = 4;
+        ctx.beginPath();
+        ctx.moveTo(-baseRadius * 0.92, baseRadius * 0.15);
+        ctx.bezierCurveTo(
+          -baseRadius * 1.02, -baseRadius * 0.58,
+          -baseRadius * 0.58, -baseRadius * 1.03,
+          0, -baseRadius * 0.98
+        );
+        ctx.bezierCurveTo(
+          baseRadius * 0.72, -baseRadius * 1.04,
+          baseRadius * 1.03, -baseRadius * 0.42,
+          baseRadius * 0.92, baseRadius * 0.27
+        );
+        ctx.bezierCurveTo(
+          baseRadius * 0.8, baseRadius * 0.9,
+          baseRadius * 0.35, baseRadius * 0.99,
+          0, baseRadius * 0.86
+        );
+        ctx.bezierCurveTo(
+          -baseRadius * 0.45, baseRadius * 1.02,
+          -baseRadius * 0.86, baseRadius * 0.74,
+          -baseRadius * 0.92, baseRadius * 0.15
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.shadowColor = "transparent";
+        ctx.shadowOffsetY = 0;
+
+        const gelShade = ctx.createLinearGradient(0, -baseRadius, 0, baseRadius);
+        gelShade.addColorStop(0, "rgba(255,255,255,0.16)");
+        gelShade.addColorStop(0.55, "rgba(255,255,255,0)");
+        gelShade.addColorStop(1, "rgba(75,11,42,0.16)");
+        ctx.fillStyle = gelShade;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, baseRadius * 0.82, baseRadius * 0.82, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const blinkScale = player.blink > 0 ? 0.12 : 1;
+        drawEye(-baseRadius * 0.25, -baseRadius * 0.28, baseRadius * 0.28, 3.5, 2.5, blinkScale);
+        drawEye(baseRadius * 0.3, -baseRadius * 0.24, baseRadius * 0.3, 4.5, 2.5, blinkScale);
+
+        ctx.strokeStyle = COLORS.ink;
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        if (state === "dying") {
+          ctx.moveTo(-6, 11);
+          ctx.lineTo(0, 6);
+          ctx.lineTo(6, 11);
+        } else {
+          ctx.arc(2, 7, 8, 0.18, Math.PI - 0.18);
+        }
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(255,255,255,0.58)";
+        ctx.beginPath();
+        ctx.ellipse(-baseRadius * 0.48, -baseRadius * 0.55, baseRadius * 0.2, baseRadius * 0.085, -0.7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.beginPath();
+        ctx.ellipse(-baseRadius * 0.62, -baseRadius * 0.3, baseRadius * 0.08, baseRadius * 0.045, -0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawEye(x, y, radius, pupilX, pupilY, blinkScale = 1) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1, blinkScale);
+        const eyeGradient = ctx.createRadialGradient(-radius * 0.35, -radius * 0.4, 1, 0, 0, radius);
+        eyeGradient.addColorStop(0, "#ffffff");
+        eyeGradient.addColorStop(0.75, "#f5f8f8");
+        eyeGradient.addColorStop(1, "#bdcbd0");
+        ctx.fillStyle = eyeGradient;
+        ctx.strokeStyle = "rgba(24,41,53,0.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = COLORS.ink;
+        ctx.beginPath();
+        ctx.arc(pupilX, pupilY, Math.max(2.5, radius * 0.35), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.86)";
+        ctx.beginPath();
+        ctx.arc(pupilX - radius * 0.1, pupilY - radius * 0.12, Math.max(1, radius * 0.09), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function drawParticles() {
+        for (const particle of particles) {
+          ctx.save();
+          ctx.globalAlpha = clamp(particle.life / particle.maxLife, 0, 1);
+          ctx.translate(particle.x, particle.y);
+          ctx.rotate(particle.rotation);
+          ctx.fillStyle = particle.color;
+          if (particle.round) {
+            ctx.beginPath();
+            ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size * 1.7, particle.size);
+          }
+          ctx.restore();
+        }
+      }
+
+      function drawPopups() {
+        for (const popup of popups) {
+          const alpha = clamp(popup.life / popup.maxLife, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.font = "900 " + popup.size + "px Trebuchet MS, Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = COLORS.ink;
+          ctx.strokeText(popup.text, popup.x, popup.y);
+          ctx.fillStyle = popup.color;
+          ctx.fillText(popup.text, popup.x, popup.y);
+          ctx.restore();
+        }
+      }
+
+      function drawHUD() {
+        const margin = clamp(width * 0.035, 18, 42);
+        const top = Math.max(24, 16 + safeTop);
+        ctx.save();
+        ctx.textBaseline = "top";
+        ctx.fillStyle = COLORS.ink;
+        ctx.textAlign = "left";
+        ctx.font = "900 " + clamp(width * 0.045, 26, 44) + "px Trebuchet MS, Arial";
+        ctx.fillText(String(score).padStart(5, "0"), margin, top);
+        ctx.font = "800 13px Trebuchet MS, Arial";
+        ctx.fillStyle = "rgba(24,49,74,0.7)";
+        ctx.fillText("SCORE  |  x" + combo + " COMBO", margin + 2, top + clamp(width * 0.045, 26, 44) + 4);
+
+        ctx.textAlign = "right";
+        ctx.fillStyle = COLORS.ink;
+        ctx.font = "900 " + clamp(width * 0.035, 22, 34) + "px Trebuchet MS, Arial";
+        ctx.fillText(String(highScore).padStart(5, "0"), width - margin, top + 2);
+        ctx.font = "800 13px Trebuchet MS, Arial";
+        ctx.fillStyle = "rgba(24,49,74,0.7)";
+        ctx.fillText("BEST", width - margin - 2, top + clamp(width * 0.035, 22, 34) + 6);
+        ctx.restore();
+      }
+
+      function drawReadyScreen() {
+        const titleSize = clamp(width * 0.12, 52, 116);
+        const centerY = height * (width < 600 ? 0.24 : 0.25);
+        const bob = Math.sin(performance.now() * 0.0035) * 5;
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        ctx.font = "900 " + titleSize + "px Trebuchet MS, Arial";
+        ctx.lineWidth = Math.max(7, titleSize * 0.1);
+        ctx.strokeStyle = COLORS.ink;
+        ctx.strokeText("CHOMP", width / 2, centerY + bob);
+        ctx.fillStyle = COLORS.yellow;
+        ctx.fillText("CHOMP", width / 2, centerY + bob);
+
+        ctx.font = "900 " + titleSize * 0.72 + "px Trebuchet MS, Arial";
+        ctx.lineWidth = Math.max(6, titleSize * 0.075);
+        ctx.strokeText("DASH", width / 2, centerY + titleSize * 0.68 + bob);
+        ctx.fillStyle = COLORS.blob;
+        ctx.fillText("DASH", width / 2, centerY + titleSize * 0.68 + bob);
+
+        const promptY = Math.min(groundY - baseRadius * 2.7, height * 0.61);
+        const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.035;
+        ctx.translate(width / 2, promptY);
+        ctx.scale(pulse, pulse);
+        ctx.font = "900 " + clamp(width * 0.046, 24, 36) + "px Trebuchet MS, Arial";
+        ctx.fillStyle = COLORS.ink;
+        ctx.fillText("TAP TO START", 0, 0);
+        ctx.font = "700 " + clamp(width * 0.024, 14, 18) + "px Trebuchet MS, Arial";
+        ctx.fillStyle = "rgba(24,49,74,0.68)";
+        ctx.fillText("SPACE OR TAP TO JUMP", 0, 36);
+        ctx.restore();
+      }
+
+      function drawGameOverScreen() {
+        ctx.save();
+        ctx.fillStyle = "rgba(24,49,74,0.34)";
+        ctx.fillRect(0, 0, width, height);
+
+        const y = height * 0.32;
+        const titleSize = clamp(width * 0.105, 46, 88);
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "900 " + titleSize + "px Trebuchet MS, Arial";
+        ctx.lineWidth = Math.max(7, titleSize * 0.1);
+        ctx.strokeStyle = COLORS.ink;
+        ctx.strokeText("GAME OVER", width / 2, y);
+        ctx.fillStyle = COLORS.cream;
+        ctx.fillText("GAME OVER", width / 2, y);
+
+        ctx.font = "900 " + clamp(width * 0.06, 30, 48) + "px Trebuchet MS, Arial";
+        ctx.fillStyle = COLORS.yellow;
+        ctx.strokeText(String(score).padStart(5, "0"), width / 2, y + titleSize * 0.95);
+        ctx.fillText(String(score).padStart(5, "0"), width / 2, y + titleSize * 0.95);
+
+        ctx.font = "800 " + clamp(width * 0.027, 15, 20) + "px Trebuchet MS, Arial";
+        ctx.fillStyle = COLORS.white;
+        ctx.fillText(newBest ? "NEW BEST!" : "BEST " + String(highScore).padStart(5, "0"), width / 2, y + titleSize * 1.43);
+
+        const pulse = 1 + Math.sin(performance.now() * 0.006) * 0.035;
+        ctx.translate(width / 2, Math.min(groundY - 80, y + titleSize * 2.2));
+        ctx.scale(pulse, pulse);
+        ctx.font = "900 " + clamp(width * 0.043, 23, 34) + "px Trebuchet MS, Arial";
+        ctx.fillStyle = COLORS.cream;
+        ctx.fillText("TAP TO RETRY", 0, 0);
+        ctx.restore();
+      }
+
+      function frame(now) {
+        const frameTime = Math.min((now - lastTime) / 1000, CONFIG.MAX_FRAME_TIME);
+        lastTime = now;
+        accumulator += frameTime;
+
+        // A fixed simulation step keeps jump height and collision behavior stable on every display.
+        while (accumulator >= CONFIG.FIXED_STEP) {
+          update(CONFIG.FIXED_STEP);
+          accumulator -= CONFIG.FIXED_STEP;
+        }
+
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      function random(min, max) {
+        return min + Math.random() * (max - min);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function lerp(a, b, amount) {
+        return a + (b - a) * amount;
+      }
+
+      window.addEventListener("resize", resize);
+      window.addEventListener("keydown", handleJumpPress, { passive: false, capture: true });
+      window.addEventListener("keyup", handleJumpRelease, { passive: false, capture: true });
+      canvas.addEventListener("pointerdown", handleJumpPress, { passive: false });
+      window.addEventListener("blur", () => {
+        player.jumpHeld = false;
+      });
+      document.addEventListener("visibilitychange", () => {
+        lastTime = performance.now();
+        accumulator = 0;
+      });
+
+      resize();
+      resetGame();
+      canvas.focus();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

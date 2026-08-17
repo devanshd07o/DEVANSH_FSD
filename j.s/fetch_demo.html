@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo fetch</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, sans-serif;
+            margin: 30px;
+            background: #f00505;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #02dafb;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: 1px solid #f605e6;
+            padding: 12px 10px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background: #2f3d4a;
+            color: rgb(126, 249, 4);
+            font-weight: 600;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        tbody tr:hover {
+            background: #f1f7ff;
+        }
+
+        img {
+            display: block;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+
+        .action-btn {
+            padding: 8px 12px;
+            margin: 4px 4px 0 0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .add-btn {
+            background: #4caf50;
+            color: white;
+        }
+
+        .order-btn {
+            background: #2196f3;
+            color: white;
+        }
+
+        .message {
+            margin-top: 15px;
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <tr>
+                <th>SrNo</th>
+                <th>Title</th>
+                <th>Image</th>
+                <th>Category</th>
+                <th>Rating</th>
+                <th>Price</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="productTableBody"></tbody>
+    </table>
+
+    <div id="message" class="message"></div>
+
+    <script>
+        const url = "https://dummyjson.com/products";
+        const usdToInr = 83; // 1 USD = 83 INR
+
+        function showMessage(msg) {
+            document.getElementById("message").textContent = msg;
+        }
+
+        async function loadProduct() {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                const tableBody = document.getElementById("productTableBody");
+
+                tableBody.innerHTML = data.products.map((product, index) => {
+                    const priceInRupees = (product.price * usdToInr).toFixed(2);
+
+                    return `
+                        <tr>
+                            <td>${index + 1}</td>
+                            <td>${product.title}</td>
+                            <td>
+                                <img src="${product.thumbnail}" alt="${product.title}" width="60" height="60" />
+                            </td>
+                            <td>${product.category}</td>
+                            <td>${product.rating}</td>
+                            <td>₹${priceInRupees}</td>
+                            <td>
+                                <button class="action-btn add-btn" data-product="${product.title}">Add to Cart</button>
+                                <button class="action-btn order-btn" data-product="${product.title}">Place Order</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join("");
+
+                document.querySelectorAll('.add-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const productName = button.getAttribute('data-product');
+                        showMessage(`${productName} added to cart.`);
+                    });
+                });
+
+                document.querySelectorAll('.order-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const productName = button.getAttribute('data-product');
+                        showMessage(`${productName} order placed successfully.`);
+                    });
+                });
+
+                console.log(data.products);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        loadProduct();
+    </script>
+</body>
+</html>

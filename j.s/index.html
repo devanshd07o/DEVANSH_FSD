@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NetFlix - Watch TV Shows Online, Watch Movies Online</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+      /* ===== CSS Variables ===== */
+      :root {
+        --netflix-red: #e50914;
+        --netflix-dark: #141414;
+        --netflix-darker: #0f0f0f;
+        --netflix-gray: #303030;
+        --netflix-light-gray: #737373;
+        --netflix-text: #ffffff;
+        --netflix-text-secondary: #e5e5e5;
+        --netflix-hover: rgba(255, 255, 255, 0.1);
+        --netflix-transition: 0.3s ease;
+      }
+
+      /* ===== Reset & Base ===== */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        background-color: var(--netflix-dark);
+        color: var(--netflix-text);
+        line-height: 1.6;
+        min-height: 100vh;
+      }
+
+      /* ===== Header ===== */
+      .header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: linear-gradient(to bottom, rgba(20, 20, 20, 0.95), rgba(20, 20, 20, 0.7), transparent);
+        padding: 20px 50px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: var(--netflix-transition);
+      }
+
+      .header.scrolled {
+        background: rgba(20, 20, 20, 0.95);
+        padding: 15px 50px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .logo {
+        font-size: 36px;
+        font-weight: bold;
+        color: var(--netflix-red);
+        text-decoration: none;
+        letter-spacing: -1px;
+      }
+
+      .logo span {
+        color: var(--netflix-text);
+      }
+
+      .header-nav {
+        display: flex;
+        align-items: center;
+        gap: 25px;
+      }
+
+      .header-nav a {
+        color: var(--netflix-text);
+        text-decoration: none;
+        font-size: 15px;
+        font-weight: 500;
+        transition: var(--netflix-transition);
+        position: relative;
+      }
+
+      .header-nav a:hover {
+        color: var(--netflix-text-secondary);
+      }
+
+      .header-nav a i {
+        margin-right: 5px;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .search-container {
+        display: flex;
+        align-items: center;
+        background: var(--netflix-gray);
+        border-radius: 4px;
+        padding: 8px 15px;
+        transition: var(--netflix-transition);
+      }
+
+      .search-container input {
+        background: transparent;
+        border: none;
+        color: var(--netflix-text);
+        outline: none;
+        width: 200px;
+        font-size: 14px;
+      }
+
+      .search-container input::placeholder {
+        color: var(--netflix-text-secondary);
+      }
+
+      .search-container i {
+        color: var(--netflix-text-secondary);
+        cursor: pointer;
+      }
+
+      .profile-menu {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .profile-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 4px;
+        object-fit: cover;
+        cursor: pointer;
+      }
+
+      .profile-dropdown {
+        position: relative;
+      }
+
+      .dropdown-menu {
+        position: absolute;
+        top: 40px;
+        right: 0;
+        background: var(--netflix-gray);
+        width: 200px;
+        border-radius: 4px;
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--netflix-transition);
+      }
+
+      .dropdown-menu.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .dropdown-menu a {
+        display: block;
+        padding: 12px 20px;
+        color: var(--netflix-text);
+        text-decoration: none;
+        font-size: 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        transition: var(--netflix-transition);
+      }
+
+      .dropdown-menu a:hover {
+        background: var(--netflix-hover);
+      }
+
+      /* ===== Hero Section ===== */
+      .hero {
+        position: relative;
+        height: 100vh;
+        min-height: 700px;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(20, 20, 20, 0.8)), url('https://image.tmdb.org/t/p/original/rIe3PnM6S7IBUmvNwDkBMX0i9EZ.jpg');
+        background-size: cover;
+        background-position: center;
+        display: flex;
+        align-items: center;
+        padding: 0 50px;
+      }
+
+      .hero-content {
+        max-width: 600px;
+        color: var(--netflix-text);
+      }
+
+      .hero-title {
+        font-size: 72px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        line-height: 1.1;
+      }
+
+      .hero-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 25px;
+      }
+
+      .hero-info span {
+        color: var(--netflix-text-secondary);
+        font-size: 16px;
+      }
+
+      .hero-rating {
+        color: var(--netflix-red);
+        font-weight: bold;
+      }
+
+      .hero-genre {
+        color: var(--netflix-text-secondary);
+      }
+
+      .hero-genre span {
+        margin-right: 10px;
+      }
+
+      .hero-description {
+        font-size: 20px;
+        margin-bottom: 30px;
+        line-height: 1.5;
+      }
+
+      .hero-buttons {
+        display: flex;
+        gap: 15px;
+      }
+
+      .btn {
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: bold;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: var(--netflix-transition);
+      }
+
+      .btn-primary {
+        background: var(--netflix-text);
+        color: var(--netflix-dark);
+      }
+
+      .btn-primary:hover {
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .btn-secondary {
+        background: rgba(109, 109, 110, 0.7);
+        color: var(--netflix-text);
+        border: 2px solid var(--netflix-text);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(109, 109, 110, 0.9);
+      }
+
+      .hero-fade {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 150px;
+        background: linear-gradient(to top, var(--netflix-dark), transparent);
+      }
+
+      /* ===== Main Content ===== */
+      .main-content {
+        padding: 50px;
+        margin-top: -100px;
+        position: relative;
+        z-index: 10;
+      }
+
+      .content-row {
+        margin-bottom: 50px;
+      }
+
+      .row-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .row-title {
+        font-size: 28px;
+        font-weight: bold;
+      }
+
+      .row-actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      .row-nav {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        color: var(--netflix-text);
+        cursor: pointer;
+        transition: var(--netflix-transition);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .row-nav:hover {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .row-container {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .row-carousel {
+        display: flex;
+        gap: 15px;
+        overflow-x: auto;
+        scroll-behavior: smooth;
+        padding: 10px 0;
+        position: relative;
+      }
+
+      .row-carousel::-webkit-scrollbar {
+        display: none;
+      }
+
+      .row-carousel:hover .carousel-nav {
+        opacity: 1;
+      }
+
+      .carousel-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 200px;
+        background: rgba(0, 0, 0, 0.6);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: var(--netflix-transition);
+        z-index: 5;
+      }
+
+      .carousel-nav:hover {
+        background: rgba(0, 0, 0, 0.8);
+      }
+
+      .carousel-nav.prev {
+        left: -20px;
+      }
+
+      .carousel-nav.next {
+        right: -20px;
+      }
+
+      .carousel-nav i {
+        color: var(--netflix-text);
+        font-size: 20px;
+      }
+
+      .card {
+        flex: none;
+        width: 280px;
+        cursor: pointer;
+        position: relative;
+        transition: var(--netflix-transition);
+      }
+
+      .card img {
+        width: 100%;
+        height: 157px;
+        object-fit: cover;
+        border-radius: 4px;
+        transition: var(--netflix-transition);
+      }
+
+      .card:hover img {
+        transform: scale(1.03);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+      }
+
+      .card-info {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+        padding: 15px 10px 10px;
+        opacity: 0;
+        transition: var(--netflix-transition);
+        border-radius: 0 0 4px 4px;
+      }
+
+      .card:hover .card-info {
+        opacity: 1;
+      }
+
+      .card-title {
+        font-size: 16px;
+        font-weight: bold;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .card-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 5px;
+        font-size: 12px;
+        color: var(--netflix-text-secondary);
+      }
+
+      .card-rating {
+        color: var(--netflix-red);
+        font-weight: bold;
+      }
+
+      .card-year {
+        color: var(--netflix-text-secondary);
+      }
+
+      .card-season {
+        background: var(--netflix-gray);
+        padding: 2px 6px;
+        border-radius: 2px;
+        font-size: 10px;
+      }
+
+      .play-button {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: var(--netflix-transition);
+        cursor: pointer;
+      }
+
+      .play-button:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      .card:hover .play-button {
+        opacity: 1;
+      }
+
+      .play-button i {
+        color: var(--netflix-text);
+        font-size: 24px;
+        margin-left: 4px;
+      }
+
+      .progress-bar {
+        position: absolute;
+        bottom: 157px;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: var(--netflix-red);
+        width: 0%;
+      }
+
+      /* ===== Featured Row ===== */
+      .featured-row {
+        margin: 80px 0;
+      }
+
+      .featured-title {
+        font-size: 32px;
+        font-weight: bold;
+        margin-bottom: 25px;
+      }
+
+      .featured-carousel {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+      }
+
+      .featured-card {
+        background: var(--netflix-gray);
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: var(--netflix-transition);
+      }
+
+      .featured-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .featured-img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+      }
+
+      .featured-content {
+        padding: 20px;
+      }
+
+      .featured-tag {
+        background: var(--netflix-red);
+        color: var(--netflix-text);
+        padding: 4px 8px;
+        border-radius: 2px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 10px;
+      }
+
+      .featured-tag.top {
+        background: #45b36b;
+      }
+
+      .featured-tag.new {
+        background: #1971c2;
+      }
+
+      .featured-card-title {
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .featured-card-desc {
+        color: var(--netflix-text-secondary);
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 15px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .featured-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .featured-meta-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .featured-rating {
+        color: var(--netflix-red);
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      .featured-age {
+        background: var(--netflix-gray);
+        padding: 2px 6px;
+        border-radius: 2px;
+        font-size: 12px;
+      }
+
+      .featured-length {
+        color: var(--netflix-text-secondary);
+        font-size: 13px;
+      }
+
+      /* ===== Modal ===== */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.95);
+        z-index: 2000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--netflix-transition);
+      }
+
+      .modal.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .modal-content {
+        background: var(--netflix-darker);
+        width: 90%;
+        max-width: 1000px;
+        border-radius: 8px;
+        overflow: hidden;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        transform: scale(0.9);
+        transition: var(--netflix-transition);
+      }
+
+      .modal.active .modal-content {
+        transform: scale(1);
+      }
+
+      .modal-header {
+        padding: 20px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: var(--netflix-text);
+        font-size: 24px;
+        cursor: pointer;
+        transition: var(--netflix-transition);
+      }
+
+      .modal-close:hover {
+        color: var(--netflix-text-secondary);
+      }
+
+      .modal-body {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .modal-video {
+        flex: 2;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--netflix-text);
+      }
+
+      .modal-video video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .modal-info {
+        flex: 1;
+        padding: 30px;
+        overflow-y: auto;
+      }
+
+      .modal-title {
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 15px;
+      }
+
+      .modal-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        color: var(--netflix-text-secondary);
+        font-size: 14px;
+      }
+
+      .modal-rating {
+        color: var(--netflix-red);
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      .modal-genre {
+        color: var(--netflix-text-secondary);
+        font-size: 13px;
+        margin-bottom: 20px;
+      }
+
+      .modal-genre span {
+        margin-right: 8px;
+      }
+
+      .modal-description {
+        color: var(--netflix-text-secondary);
+        line-height: 1.7;
+        margin-bottom: 25px;
+      }
+
+      .modal-buttons {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .modal-episode {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .episode-number {
+        color: var(--netflix-text-secondary);
+        font-size: 14px;
+      }
+
+      .episode-title {
+        font-weight: bold;
+      }
+
+      /* ===== Footer ===== */
+      .footer {
+        background: var(--netflix-darker);
+        padding: 50px;
+        margin-top: 100px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .footer-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 40px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .footer-section h3 {
+        font-size: 16px;
+        margin-bottom: 20px;
+        color: var(--netflix-text);
+      }
+
+      .footer-section ul {
+        list-style: none;
+      }
+
+      .footer-section li {
+        margin-bottom: 12px;
+      }
+
+      .footer-section a {
+        color: var(--netflix-text-secondary);
+        text-decoration: none;
+        font-size: 14px;
+        transition: var(--netflix-transition);
+      }
+
+      .footer-section a:hover {
+        color: var(--netflix-text);
+        text-decoration: underline;
+      }
+
+      .footer-bottom {
+        margin-top: 40px;
+        padding-top: 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--netflix-text-secondary);
+        font-size: 13px;
+      }
+
+      .language-selector {
+        background: transparent;
+        border: 1px solid var(--netflix-text-secondary);
+        color: var(--netflix-text);
+        padding: 8px 15px;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+
+      /* ===== Responsive Design ===== */
+      @media (max-width: 1024px) {
+        .hero {
+          padding: 0 30px;
+        }
+        .hero-title {
+          font-size: 56px;
+        }
+        .hero-description {
+          font-size: 18px;
+        }
+        .main-content {
+          padding: 30px;
+        }
+        .row-title {
+          font-size: 24px;
+        }
+        .modal-body {
+          flex-direction: column;
+        }
+        .modal-video {
+          height: 300px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .header {
+          padding: 15px 20px;
+        }
+        .header-nav {
+          display: none;
+        }
+        .search-container {
+          display: none;
+        }
+        .hero {
+          height: 80vh;
+          min-height: 500px;
+          background-position: top;
+        }
+        .hero-title {
+          font-size: 42px;
+        }
+        .hero-buttons {
+          flex-direction: column;
+        }
+        .card {
+          width: 180px;
+        }
+        .card img {
+          height: 100px;
+        }
+        .featured-carousel {
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        }
+        .modal-content {
+          width: 95%;
+          margin: 20px;
+        }
+        .modal-body {
+          flex-direction: column;
+        }
+        .modal-video {
+          height: 250px;
+        }
+        .modal-info {
+          padding: 20px;
+        }
+        .footer-content {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 480px) {
+        .logo {
+          font-size: 28px;
+        }
+        .header-right {
+          gap: 10px;
+        }
+        .profile-menu {
+          display: none;
+        }
+        .hero {
+          padding: 0 20px;
+        }
+        .hero-title {
+          font-size: 32px;
+        }
+        .hero-info {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .hero-buttons {
+          width: 100%;
+        }
+        .hero-buttons .btn {
+          width: 100%;
+          justify-content: center;
+        }
+        .main-content {
+          padding: 20px;
+        }
+        .row-title {
+          font-size: 20px;
+        }
+        .card {
+          width: 140px;
+        }
+        .card img {
+          height: 80px;
+        }
+        .featured-carousel {
+          grid-template-columns: 1fr;
+        }
+        .footer-content {
+          grid-template-columns: 1fr;
+          gap: 30px;
+        }
+      }
+
+      /* ===== Animations ===== */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .content-row {
+        animation: fadeIn 0.5s ease forwards;
+      }
+
+      .content-row:nth-child(1) { animation-delay: 0.1s; }
+      .content-row:nth-child(2) { animation-delay: 0.2s; }
+      .content-row:nth-child(3) { animation-delay: 0.3s; }
+      .content-row:nth-child(4) { animation-delay: 0.4s; }
+      .content-row:nth-child(5) { animation-delay: 0.5s; }
+
+      /* ===== Loading State ===== */
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        color: var(--netflix-text-secondary);
+      }
+
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid rgba(255, 255, 255, 0.1);
+        border-top-color: var(--netflix-red);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* ===== Tooltip ===== */
+      .tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--netflix-dark);
+        padding: 10px 15px;
+        border-radius: 4px;
+        font-size: 12px;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--netflix-transition);
+        z-index: 10;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      }
+
+      .tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: var(--netflix-dark);
+      }
+
+      .card:hover .tooltip {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      /* ===== Notification ===== */
+      .notification {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: var(--netflix-gray);
+        padding: 15px 25px;
+        border-radius: 4px;
+        color: var(--netflix-text);
+        font-size: 14px;
+        opacity: 0;
+        transform: translateX(100px);
+        transition: var(--netflix-transition);
+        z-index: 1500;
+      }
+
+      .notification.active {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .notification.success {
+        background: #45b36b;
+      }
+
+      .notification.error {
+        background: #e50914;
+      }
+
+      /* ===== My List Toggle ===== */
+      .list-toggle {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        border: none;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        color: var(--netflix-text);
+        cursor: pointer;
+        opacity: 0;
+        transition: var(--netflix-transition);
+        z-index: 5;
+      }
+
+      .card:hover .list-toggle {
+        opacity: 1;
+      }
+
+      .list-toggle.active {
+        background: var(--netflix-red);
+      }
+
+      .list-toggle i {
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header" id="header">
+      <a href="#" class="logo">NET<span>FLIX</span></a>
+      <nav class="header-nav">
+        <a href="#"><i class="fas fa-home"></i> Home</a>
+        <a href="#tv-shows"><i class="fas fa-tv"></i> TV Shows</a>
+        <a href="#movies"><i class="fas fa-film"></i> Movies</a>
+        <a href="#new-popular"><i class="fas fa-fire"></i> New & Popular</a>
+        <a href="#my-list"><i class="fas fa-bookmark"></i> My List</a>
+        <a href="#browse-language"><i class="fas fa-globe"></i> Browse by Language</a>
+      </nav>
+      <div class="header-right">
+        <div class="search-container">
+          <i class="fas fa-search"></i>
+          <input type="text" placeholder="Search..." id="search-input">
+        </div>
+        <div class="profile-menu">
+          <div class="profile-dropdown" id="profile-dropdown">
+            <img src="https://randomuser.me/api/portraits/men/32.jpg" alt="Profile" class="profile-avatar">
+            <div class="dropdown-menu" id="dropdown-menu">
+              <a href="#"><i class="fas fa-user"></i> Manage Profiles</a>
+              <a href="#"><i class="fas fa-cog"></i> Account</a>
+              <a href="#"><i class="fas fa-help-circle"></i> Help Center</a>
+              <a href="#" id="sign-out"><i class="fas fa-sign-out-alt"></i> Sign out of Netflix</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+      <div class="hero-content">
+        <h1 class="hero-title" id="hero-title">Stranger Things</h1>
+        <div class="hero-info">
+          <span class="hero-rating">95% Match</span>
+          <span>2016</span>
+          <span class="hero-genre">
+            <span>Sci-Fi</span>
+            <span>Horror</span>
+            <span>Drama</span>
+          </span>
+          <span>16+</span>
+        </div>
+        <p class="hero-description" id="hero-description">
+          When a young boy disappears, his mother, a police chief and his friends must confront terrifying forces in order to get him back.
+        </p>
+        <div class="hero-buttons">
+          <a href="#" class="btn btn-primary" id="play-btn">
+            <i class="fas fa-play"></i> Play
+          </a>
+          <a href="#" class="btn btn-secondary" id="more-info-btn">
+            <i class="fas fa-info-circle"></i> More Info
+          </a>
+        </div>
+      </div>
+      <div class="hero-fade"></div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Trending Now -->
+      <section class="content-row" id="trending">
+        <div class="row-header">
+          <h2 class="row-title">Trending Now</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('trending-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('trending-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="trending-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Top Rated -->
+      <section class="content-row" id="top-rated">
+        <div class="row-header">
+          <h2 class="row-title">Top Rated on Netflix</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('top-rated-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('top-rated-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="top-rated-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- New Releases -->
+      <section class="content-row" id="new-releases">
+        <div class="row-header">
+          <h2 class="row-title">New Releases</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('new-releases-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('new-releases-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="new-releases-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Continue Watching -->
+      <section class="content-row" id="continue-watching">
+        <div class="row-header">
+          <h2 class="row-title">Continue Watching for You</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('continue-watching-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('continue-watching-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="continue-watching-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Only on Netflix -->
+      <section class="content-row" id="only-on-netflix">
+        <div class="row-header">
+          <h2 class="row-title">Only on Netflix</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('only-on-netflix-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('only-on-netflix-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="only-on-netflix-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Popular on Netflix -->
+      <section class="content-row" id="popular">
+        <div class="row-header">
+          <h2 class="row-title">Popular on Netflix</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('popular-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('popular-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="popular-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- Netflix Originals -->
+      <section class="content-row featured-row" id="netflix-originals">
+        <h2 class="featured-title">Netflix Originals</h2>
+        <div class="featured-carousel" id="netflix-originals-carousel">
+          <!-- Cards will be populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Upcoming -->
+      <section class="content-row" id="upcoming">
+        <div class="row-header">
+          <h2 class="row-title">Upcoming</h2>
+          <div class="row-actions">
+            <button class="row-nav" onclick="scrollRow('upcoming-carousel', -300)">
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="row-nav" onclick="scrollRow('upcoming-carousel', 300)">
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+        <div class="row-container">
+          <div class="row-carousel" id="upcoming-carousel">
+            <!-- Cards will be populated by JavaScript -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>FAQ</h3>
+          <ul>
+            <li><a href="#">What is Netflix?</a></li>
+            <li><a href="#">How does Netflix work?</a></li>
+            <li><a href="#">Where can I watch?</a></li>
+            <li><a href="#">How do I cancel?</a></li>
+            <li><a href="#">What can I watch on Netflix?</a></li>
+            <li><a href="#">Is Netflix good for kids?</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h3>Help Center</h3>
+          <ul>
+            <li><a href="#">Netflix Shop</a></li>
+            <li><a href="#">Terms of Use</a></li>
+            <li><a href="#">Privacy</a></li>
+            <li><a href="#">Cookie Preferences</a></li>
+            <li><a href="#">Corporate Information</a></li>
+            <li><a href="#">Contact Us</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h3>Netflix Originals</h3>
+          <ul>
+            <li><a href="#">Stranger Things</a></li>
+            <li><a href="#">The Witcher</a></li>
+            <li><a href="#">Bridgerton</a></li>
+            <li><a href="#">Squid Game</a></li>
+            <li><a href="#">Money Heist</a></li>
+            <li><a href="#">Ozark</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h3>My Account</h3>
+          <ul>
+            <li><a href="#">Manage Profiles</a></li>
+            <li><a href="#">Account Settings</a></li>
+            <li><a href="#">Parental Controls</a></li>
+            <li><a href="#">Watch History</a></li>
+            <li><a href="#">My List</a></li>
+            <li><a href="#">Redeem Gift Cards</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>Netflix Clone - Built with passion for entertainment. All rights reserved to their respective owners.</p>
+        <p style="margin-top: 10px;">
+          <select class="language-selector">
+            <option value="en">English</option>
+            <option value="es">Espa\u00f1ol</option>
+            <option value="fr">Fran\u00e7ais</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </p>
+      </div>
+    </footer>
+
+    <!-- Modal -->
+    <div class="modal" id="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="modal-title">Movie Title</h2>
+          <button class="modal-close" id="modal-close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-video" id="modal-video">
+            <video controls autoplay>
+              <source src="" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <div class="modal-info">
+            <div class="modal-meta">
+              <span class="modal-rating" id="modal-rating">95% Match</span>
+              <span id="modal-year">2023</span>
+              <span id="modal-age">16+</span>
+              <span id="modal-length">2h 30m</span>
+            </div>
+            <div class="modal-genre" id="modal-genre">
+              <span>Action</span>
+              <span>Adventure</span>
+              <span>Sci-Fi</span>
+            </div>
+            <p class="modal-description" id="modal-description">
+              Movie description goes here...
+            </p>
+            <div class="modal-buttons">
+              <a href="#" class="btn btn-primary">
+                <i class="fas fa-play"></i> Play
+              </a>
+              <a href="#" class="btn btn-secondary" id="add-to-list-modal">
+                <i class="fas fa-plus"></i> My List
+              </a>
+              <a href="#" class="btn btn-secondary">
+                <i class="fas fa-thumbs-up"></i> Rate
+              </a>
+            </div>
+            <div class="modal-episode" id="modal-episode">
+              <span class="episode-number">Season 1, Episode 1</span>
+              <span class="episode-title">Pilot</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+      <i class="fas fa-check-circle"></i> <span id="notification-text"></span>
+    </div>
+
+    <script>
+      // ===== Sample Data =====
+      const sampleContent = {
+        trending: [
+          { id: 1, title: 'Stranger Things', year: 2016, rating: 95, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '4 Seasons', inList: false, progress: 65 },
+          { id: 2, title: 'The Witcher', year: 2019, rating: 91, genres: ['Fantasy', 'Action', 'Adventure'], image: 'https://image.tmdb.org/t/p/w500/AeToxEYnX6p2x60E51V37Y8leB.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 3, title: 'Squid Game', year: 2021, rating: 88, genres: ['Thriller', 'Drama', 'Action'], image: 'https://image.tmdb.org/t/p/w500/dDlEaFVStH1x3p5KXs2Vp5c2iIp.jpg', type: 'tv', age: '18+', duration: '1 Season', inList: false, progress: 0 },
+          { id: 4, title: 'Money Heist', year: 2017, rating: 92, genres: ['Crime', 'Thriller', 'Action'], image: 'https://image.tmdb.org/t/p/w500/5P4f8XJd2ptVzB83SA401tBSm.jpg', type: 'tv', age: '16+', duration: '5 Parts', inList: false, progress: 80 },
+          { id: 5, title: 'Bridgerton', year: 2020, rating: 87, genres: ['Romance', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 6, title: 'Ozark', year: 2017, rating: 93, genres: ['Crime', 'Drama', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/zTijX6Xxm4s0m9M4KdL5Hjy5Ryd.jpg', type: 'tv', age: '18+', duration: '4 Seasons', inList: false, progress: 45 },
+          { id: 7, title: 'Dark', year: 2017, rating: 94, genres: ['Sci-Fi', 'Mystery', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 8, title: 'Arcane', year: 2021, rating: 97, genres: ['Animation', 'Action', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: false, progress: 0 },
+          { id: 9, title: 'You', year: 2018, rating: 89, genres: ['Thriller', 'Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/yt2QQxKYj24Nj2V6q8Wk55Hj0nN.jpg', type: 'tv', age: '18+', duration: '4 Seasons', inList: false, progress: 0 },
+          { id: 10, title: 'Cobra Kai', year: 2018, rating: 86, genres: ['Action', 'Comedy', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/wTfEH01J5jH1DnV8n9Zq9qg4E2p.jpg', type: 'tv', age: '12+', duration: '5 Seasons', inList: false, progress: 0 }
+        ],
+        topRated: [
+          { id: 11, title: 'The Shawshank Redemption', year: 1994, rating: 98, genres: ['Drama'], image: 'https://image.tmdb.org/t/p/w500/5KCVkau1H88OCRkWJ1gEf3Y7Fm.jpg', type: 'movie', age: '16+', duration: '2h 22m', inList: false, progress: 0 },
+          { id: 12, title: 'The Godfather', year: 1972, rating: 97, genres: ['Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg', type: 'movie', age: '18+', duration: '2h 55m', inList: false, progress: 0 },
+          { id: 13, title: 'The Godfather Part II', year: 1974, rating: 96, genres: ['Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/heeW29zbuta9d8YgT6cCA7615aM.jpg', type: 'movie', age: '18+', duration: '3h 22m', inList: false, progress: 0 },
+          { id: 14, title: 'Pulp Fiction', year: 1994, rating: 95, genres: ['Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'movie', age: '18+', duration: '2h 34m', inList: false, progress: 0 },
+          { id: 15, title: 'Schindler\'s List', year: 1993, rating: 95, genres: ['Biography', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/yPisjyLweCl1tbgwgtzB1I4M8Tn.jpg', type: 'movie', age: '18+', duration: '3h 15m', inList: false, progress: 0 },
+          { id: 16, title: '12 Angry Men', year: 1957, rating: 94, genres: ['Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/2b0qndI5p3224P7l522y6el9w8.jpg', type: 'movie', age: '12+', duration: '1h 36m', inList: false, progress: 0 },
+          { id: 17, title: 'Inception', year: 2010, rating: 93, genres: ['Action', 'Adventure', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg', type: 'movie', age: '12+', duration: '2h 28m', inList: false, progress: 0 },
+          { id: 18, title: 'Fight Club', year: 1999, rating: 93, genres: ['Drama'], image: 'https://image.tmdb.org/t/p/w500/o22YJ7r8A7OYlXxvz42Q0Y222H.jpg', type: 'movie', age: '18+', duration: '2h 19m', inList: false, progress: 0 },
+          { id: 19, title: 'Forrest Gump', year: 1994, rating: 92, genres: ['Drama', 'Romance'], image: 'https://image.tmdb.org/t/p/w500/arw2vcBveW2R7L6OtFu8TeNlqM.jpg', type: 'movie', age: '16+', duration: '2h 22m', inList: false, progress: 0 },
+          { id: 20, title: 'The Matrix', year: 1999, rating: 92, genres: ['Action', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/f9JMyoLQFk6A5s1y2onq5pQHbdg.jpg', type: 'movie', age: '16+', duration: '2h 16m', inList: false, progress: 0 }
+        ],
+        newReleases: [
+          { id: 21, title: 'The Super Mario Bros. Movie', year: 2023, rating: 82, genres: ['Animation', 'Adventure', 'Comedy'], image: 'https://image.tmdb.org/t/p/w500/qdB2O7j71An4y8Yf00T1s1EZKj5.jpg', type: 'movie', age: '7+', duration: '1h 32m', inList: false, progress: 0 },
+          { id: 22, title: 'John Wick: Chapter 4', year: 2023, rating: 88, genres: ['Action', 'Crime', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/vF87Jfe224dYs760x5uX3PTrK3B.jpg', type: 'movie', age: '18+', duration: '2h 49m', inList: false, progress: 0 },
+          { id: 23, title: 'Guardians of the Galaxy Vol. 3', year: 2023, rating: 85, genres: ['Action', 'Adventure', 'Comedy'], image: 'https://image.tmdb.org/t/p/w500/r2J02Z221e0P76Y57oL5n6gLMAE.jpg', type: 'movie', age: '12+', duration: '2h 30m', inList: false, progress: 0 },
+          { id: 24, title: 'Fast X', year: 2023, rating: 78, genres: ['Action', 'Adventure', 'Crime'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'movie', age: '12+', duration: '2h 21m', inList: false, progress: 0 },
+          { id: 25, title: 'Ant-Man and The Wasp: Quantumania', year: 2023, rating: 75, genres: ['Action', 'Adventure', 'Comedy'], image: 'https://image.tmdb.org/t/p/w500/ngl23GuGx9O3D6eMp2c3sJ2X2Rg.jpg', type: 'movie', age: '12+', duration: '2h 5m', inList: false, progress: 0 },
+          { id: 26, title: 'Creed III', year: 2023, rating: 80, genres: ['Drama', 'Sport'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'movie', age: '12+', duration: '1h 56m', inList: false, progress: 0 },
+          { id: 27, title: '65', year: 2023, rating: 68, genres: ['Sci-Fi', 'Thriller', 'Action'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'movie', age: '12+', duration: '1h 33m', inList: false, progress: 0 },
+          { id: 28, title: 'Knock at the Cabin', year: 2023, rating: 72, genres: ['Horror', 'Mystery', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'movie', age: '16+', duration: '1h 40m', inList: false, progress: 0 },
+          { id: 29, title: 'A Man of Action', year: 2023, rating: 70, genres: ['Action', 'Western'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'movie', age: '16+', duration: '1h 51m', inList: false, progress: 0 },
+          { id: 30, title: 'Tetris', year: 2023, rating: 80, genres: ['Biography', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'movie', age: '12+', duration: '1h 58m', inList: false, progress: 0 }
+        ],
+        continueWatching: [
+          { id: 1, title: 'Stranger Things', year: 2016, rating: 95, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '4 Seasons', inList: true, progress: 65 },
+          { id: 4, title: 'Money Heist', year: 2017, rating: 92, genres: ['Crime', 'Thriller', 'Action'], image: 'https://image.tmdb.org/t/p/w500/5P4f8XJd2ptVzB83SA401tBSm.jpg', type: 'tv', age: '16+', duration: '5 Parts', inList: false, progress: 80 },
+          { id: 6, title: 'Ozark', year: 2017, rating: 93, genres: ['Crime', 'Drama', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/zTijX6Xxm4s0m9M4KdL5Hjy5Ryd.jpg', type: 'tv', age: '18+', duration: '4 Seasons', inList: false, progress: 45 },
+          { id: 31, title: 'Wednesday', year: 2022, rating: 88, genres: ['Comedy', 'Crime', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: true, progress: 30 },
+          { id: 32, title: 'The Night Agent', year: 2023, rating: 78, genres: ['Action', 'Thriller', 'Mystery'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '1 Season', inList: false, progress: 15 },
+          { id: 33, title: 'You', year: 2018, rating: 89, genres: ['Thriller', 'Crime', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/yt2QQxKYj24Nj2V6q8Wk55Hj0nN.jpg', type: 'tv', age: '18+', duration: '4 Seasons', inList: false, progress: 70 },
+          { id: 34, title: 'Outer Banks', year: 2020, rating: 85, genres: ['Action', 'Adventure', 'Mystery'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: true, progress: 50 },
+          { id: 35, title: 'All of Us Are Dead', year: 2022, rating: 83, genres: ['Action', 'Horror', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'tv', age: '18+', duration: '2 Seasons', inList: false, progress: 25 },
+          { id: 36, title: 'Elite', year: 2018, rating: 82, genres: ['Crime', 'Drama', 'Romance'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'tv', age: '16+', duration: '7 Seasons', inList: false, progress: 90 },
+          { id: 37, title: 'Sex Education', year: 2019, rating: 87, genres: ['Comedy', 'Drama', 'Romance'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '18+', duration: '4 Seasons', inList: false, progress: 10 }
+        ],
+        onlyOnNetflix: [
+          { id: 1, title: 'Stranger Things', year: 2016, rating: 95, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '4 Seasons', inList: false, progress: 65, tag: 'NETFLIX ORIGINAL' },
+          { id: 2, title: 'The Witcher', year: 2019, rating: 91, genres: ['Fantasy', 'Action', 'Adventure'], image: 'https://image.tmdb.org/t/p/w500/AeToxEYnX6p2x60E51V37Y8leB.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0, tag: 'NETFLIX ORIGINAL' },
+          { id: 8, title: 'Arcane', year: 2021, rating: 97, genres: ['Animation', 'Action', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: false, progress: 0, tag: 'NETFLIX ORIGINAL' },
+          { id: 21, title: 'The Super Mario Bros. Movie', year: 2023, rating: 82, genres: ['Animation', 'Adventure', 'Comedy'], image: 'https://image.tmdb.org/t/p/w500/qdB2O7j71An4y8Yf00T1s1EZKj5.jpg', type: 'movie', age: '7+', duration: '1h 32m', inList: false, progress: 0, tag: 'NETFLIX FILM' },
+          { id: 31, title: 'Wednesday', year: 2022, rating: 88, genres: ['Comedy', 'Crime', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: true, progress: 30, tag: 'NETFLIX ORIGINAL' },
+          { id: 38, title: 'Extracttion 2', year: 2023, rating: 85, genres: ['Action', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'movie', age: '16+', duration: '2h 4m', inList: false, progress: 0, tag: 'NETFLIX FILM' },
+          { id: 39, title: 'The Adam Project', year: 2022, rating: 78, genres: ['Action', 'Adventure', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'movie', age: '12+', duration: '1h 46m', inList: false, progress: 0, tag: 'NETFLIX FILM' },
+          { id: 40, title: 'Red Notice', year: 2021, rating: 75, genres: ['Action', 'Comedy', 'Crime'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'movie', age: '12+', duration: '1h 58m', inList: false, progress: 0, tag: 'NETFLIX FILM' },
+          { id: 41, title: 'Don\'t Look Up', year: 2021, rating: 80, genres: ['Comedy', 'Drama', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'movie', age: '16+', duration: '2h 18m', inList: false, progress: 0, tag: 'NETFLIX FILM' },
+          { id: 42, title: 'The Gray Man', year: 2022, rating: 72, genres: ['Action', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'movie', age: '16+', duration: '2h 2m', inList: false, progress: 0, tag: 'NETFLIX FILM' }
+        ],
+        popular: [
+          { id: 3, title: 'Squid Game', year: 2021, rating: 88, genres: ['Thriller', 'Drama', 'Action'], image: 'https://image.tmdb.org/t/p/w500/dDlEaFVStH1x3p5KXs2Vp5c2iIp.jpg', type: 'tv', age: '18+', duration: '1 Season', inList: false, progress: 0 },
+          { id: 22, title: 'John Wick: Chapter 4', year: 2023, rating: 88, genres: ['Action', 'Crime', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/vF87Jfe224dYs760x5uX3PTrK3B.jpg', type: 'movie', age: '18+', duration: '2h 49m', inList: false, progress: 0 },
+          { id: 5, title: 'Bridgerton', year: 2020, rating: 87, genres: ['Romance', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 4, title: 'Money Heist', year: 2017, rating: 92, genres: ['Crime', 'Thriller', 'Action'], image: 'https://image.tmdb.org/t/p/w500/5P4f8XJd2ptVzB83SA401tBSm.jpg', type: 'tv', age: '16+', duration: '5 Parts', inList: false, progress: 80 },
+          { id: 23, title: 'Guardians of the Galaxy Vol. 3', year: 2023, rating: 85, genres: ['Action', 'Adventure', 'Comedy'], image: 'https://image.tmdb.org/t/p/w500/r2J02Z221e0P76Y57oL5n6gLMAE.jpg', type: 'movie', age: '12+', duration: '2h 30m', inList: false, progress: 0 },
+          { id: 7, title: 'Dark', year: 2017, rating: 94, genres: ['Sci-Fi', 'Mystery', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 2, title: 'The Witcher', year: 2019, rating: 91, genres: ['Fantasy', 'Action', 'Adventure'], image: 'https://image.tmdb.org/t/p/w500/AeToxEYnX6p2x60E51V37Y8leB.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0 },
+          { id: 1, title: 'Stranger Things', year: 2016, rating: 95, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '4 Seasons', inList: false, progress: 65 },
+          { id: 8, title: 'Arcane', year: 2021, rating: 97, genres: ['Animation', 'Action', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: false, progress: 0 },
+          { id: 31, title: 'Wednesday', year: 2022, rating: 88, genres: ['Comedy', 'Crime', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: true, progress: 30 }
+        ],
+        netflixOriginals: [
+          { id: 1, title: 'Stranger Things', year: 2016, rating: 95, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: '4 Seasons', inList: false, progress: 65, tag: 'NETFLIX ORIGINAL', description: 'When a young boy disappears, his mother, a police chief and his friends must confront terrifying forces in order to get him back.' },
+          { id: 2, title: 'The Witcher', year: 2019, rating: 91, genres: ['Fantasy', 'Action', 'Adventure'], image: 'https://image.tmdb.org/t/p/w500/AeToxEYnX6p2x60E51V37Y8leB.jpg', type: 'tv', age: '16+', duration: '3 Seasons', inList: false, progress: 0, tag: 'NETFLIX ORIGINAL', description: 'Geralt of Rivia, a mutated monster-hunter for hire, journeys toward his destiny in a turbulent world where people often prove more wicked than beasts.' },
+          { id: 8, title: 'Arcane', year: 2021, rating: 97, genres: ['Animation', 'Action', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: false, progress: 0, tag: 'NETFLIX ORIGINAL', description: 'Set in utopia, Arcane is a tale of two sisters, Vi and Powder, who fight to survive on the streets of Zaun.' },
+          { id: 31, title: 'Wednesday', year: 2022, rating: 88, genres: ['Comedy', 'Crime', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '12+', duration: '1 Season', inList: true, progress: 30, tag: 'NETFLIX ORIGINAL', description: 'Follows Wednesday Addams as she investigates a monster attack at her new school.' },
+          { id: 38, title: 'Extracttion 2', year: 2023, rating: 85, genres: ['Action', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'movie', age: '16+', duration: '2h 4m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'After barely surviving his toppled extraction in Dhaka, Tyler Rake is back and ready to take on another near-impossible mission.' },
+          { id: 39, title: 'The Adam Project', year: 2022, rating: 78, genres: ['Action', 'Adventure', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'movie', age: '12+', duration: '1h 46m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'A man on a mission to save the future teams up with his 12-year-old self on an adventure that could change both of their lives.' },
+          { id: 40, title: 'Red Notice', year: 2021, rating: 75, genres: ['Action', 'Comedy', 'Crime'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'movie', age: '12+', duration: '1h 58m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'An Interpol-issued Red Notice is a global alert to hunt and capture the world\'s most wanted. But when a daring heist brings together the FBI\'s top profiler and two rival criminals, there\'s no telling what will happen.' },
+          { id: 41, title: 'Don\'t Look Up', year: 2021, rating: 80, genres: ['Comedy', 'Drama', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'movie', age: '16+', duration: '2h 18m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'Two lowly astronomers must go on a giant media tour to warn humanity about a planet-killing comet.' },
+          { id: 42, title: 'The Gray Man', year: 2022, rating: 72, genres: ['Action', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'movie', age: '16+', duration: '2h 2m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'When the CIA\'s most skilled operative—whose true identity is known to none—accidentally uncovers dark agency secrets, a global manhunt is triggered.' },
+          { id: 43, title: 'All Quiet on the Western Front', year: 2022, rating: 88, genres: ['Drama', 'History', 'War'], image: 'https://image.tmdb.org/t/p/w500/7XJ7j3z1mlj1PH3Z2Q5QfHJn9T.jpg', type: 'movie', age: '18+', duration: '2h 28m', inList: false, progress: 0, tag: 'NETFLIX FILM', description: 'A young German soldier\'s terrifying experiences and distress on the western front during World War I.' }
+        ],
+        upcoming: [
+          { id: 44, title: 'The Crown - Season 6', year: 2023, rating: 0, genres: ['Biography', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '12+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: 'Dec 2023' },
+          { id: 45, title: 'One Piece - Live Action', year: 2023, rating: 0, genres: ['Action', 'Adventure', 'Fantasy'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '12+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: 'Aug 2023' },
+          { id: 46, title: 'Rebel Moon', year: 2023, rating: 0, genres: ['Action', 'Adventure', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'movie', age: '16+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: 'Dec 2023' },
+          { id: 47, title: 'The Killer', year: 2023, rating: 0, genres: ['Action', 'Crime', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/dM2w364MScsFG5g4g1ZDY7tENiS.jpg', type: 'movie', age: '18+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: 'Nov 2023' },
+          { id: 48, title: 'Squid Game - Season 2', year: 2024, rating: 0, genres: ['Thriller', 'Drama', 'Action'], image: 'https://image.tmdb.org/t/p/w500/dDlEaFVStH1x3p5KXs2Vp5c2iIp.jpg', type: 'tv', age: '18+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: '2024' },
+          { id: 49, title: 'Bridgerton - Season 3', year: 2024, rating: 0, genres: ['Romance', 'Drama', 'History'], image: 'https://image.tmdb.org/t/p/w500/8p9cj0E3WgG9J146loYj2dQP7J.jpg', type: 'tv', age: '16+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: '2024' },
+          { id: 50, title: 'The Witcher - Season 4', year: 2024, rating: 0, genres: ['Fantasy', 'Action', 'Adventure'], image: 'https://image.tmdb.org/t/p/w500/AeToxEYnX6p2x60E51V37Y8leB.jpg', type: 'tv', age: '16+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: '2024' },
+          { id: 51, title: 'Stranger Things - Season 5', year: 2025, rating: 0, genres: ['Sci-Fi', 'Horror', 'Drama'], image: 'https://image.tmdb.org/t/p/w500/5gzzkR7y3hnY8AD1wXjCnVlHba5.jpg', type: 'tv', age: '16+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: '2025' },
+          { id: 52, title: '3 Body Problem', year: 2024, rating: 0, genres: ['Sci-Fi', 'Mystery', 'Thriller'], image: 'https://image.tmdb.org/t/p/w500/rIp8g5F5Kd9b2JvX5Tj6jH2XKQA.jpg', type: 'tv', age: '16+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: '2024' },
+          { id: 53, title: 'Fallout', year: 2024, rating: 0, genres: ['Action', 'Adventure', 'Sci-Fi'], image: 'https://image.tmdb.org/t/p/w500/86r5p8cQA2b73t2j80X9Tt8kQJ.jpg', type: 'tv', age: '18+', duration: 'Coming Soon', inList: false, progress: 0, releaseDate: 'Apr 2024' }
+        ]
+      };
+
+      // ===== My List State =====
+      let myList = JSON.parse(localStorage.getItem('myList')) || [];
+
+      // ===== DOM Elements =====
+      const header = document.getElementById('header');
+      const hero = document.getElementById('hero');
+      const heroTitle = document.getElementById('hero-title');
+      const heroDescription = document.getElementById('hero-description');
+      const modal = document.getElementById('modal');
+      const modalClose = document.getElementById('modal-close');
+      const modalTitle = document.getElementById('modal-title');
+      const modalRating = document.getElementById('modal-rating');
+      const modalYear = document.getElementById('modal-year');
+      const modalAge = document.getElementById('modal-age');
+      const modalLength = document.getElementById('modal-length');
+      const modalGenre = document.getElementById('modal-genre');
+      const modalDescription = document.getElementById('modal-description');
+      const modalEpisode = document.getElementById('modal-episode');
+      const modalVideo = document.getElementById('modal-video');
+      const notification = document.getElementById('notification');
+      const notificationText = document.getElementById('notification-text');
+      const playBtn = document.getElementById('play-btn');
+      const moreInfoBtn = document.getElementById('more-info-btn');
+      const searchInput = document.getElementById('search-input');
+      const profileDropdown = document.getElementById('profile-dropdown');
+      const dropdownMenu = document.getElementById('dropdown-menu');
+      const signOut = document.getElementById('sign-out');
+
+      // ===== Initialize =====
+      document.addEventListener('DOMContentLoaded', () => {
+        renderAllRows();
+        setupEventListeners();
+        updateHero();
+        updateMyList();
+      });
+
+      // ===== Render Functions =====
+      function renderAllRows() {
+        renderRow('trending-carousel', sampleContent.trending);
+        renderRow('top-rated-carousel', sampleContent.topRated);
+        renderRow('new-releases-carousel', sampleContent.newReleases);
+        renderRow('continue-watching-carousel', sampleContent.continueWatching);
+        renderRow('only-on-netflix-carousel', sampleContent.onlyOnNetflix);
+        renderRow('popular-carousel', sampleContent.popular);
+        renderRow('upcoming-carousel', sampleContent.upcoming);
+        renderFeaturedRow('netflix-originals-carousel', sampleContent.netflixOriginals);
+      }
+
+      function renderRow(carouselId, items) {
+        const carousel = document.getElementById(carouselId);
+        carousel.innerHTML = '';
+        items.forEach(item => {
+          const card = createCard(item, carouselId);
+          carousel.appendChild(card);
+        });
+      }
+
+      function renderFeaturedRow(carouselId, items) {
+        const carousel = document.getElementById(carouselId);
+        carousel.innerHTML = '';
+        items.forEach(item => {
+          const card = createFeaturedCard(item);
+          carousel.appendChild(card);
+        });
+      }
+
+      function createCard(item, carouselId) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.id = item.id;
+        card.dataset.type = carouselId;
+
+        // Check if item is in My List
+        const isInList = myList.some(listItem => listItem.id === item.id);
+        const listIcon = isInList ? 'fa-check' : 'fa-plus';
+
+        card.innerHTML = `
+          <button class="list-toggle ${isInList ? 'active' : ''}" onclick="toggleMyList(${item.id}, event)">
+            <i class="fas ${listIcon}"></i>
+          </button>
+          ${item.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width: ${item.progress}%"></div></div>` : ''}
+          <img src="${item.image}" alt="${item.title}">
+          <button class="play-button" onclick="openModal(${item.id})">
+            <i class="fas fa-play"></i>
+          </button>
+          <div class="card-info">
+            <h3 class="card-title">${item.title}</h3>
+            <div class="card-meta">
+              <span class="card-rating">${item.rating}%</span>
+              <span class="card-year">${item.year}</span>
+              ${item.type === 'tv' ? `<span class="card-season">${item.duration}</span>` : `<span class="card-year">${item.duration}</span>`}
+            </div>
+          </div>
+        `;
+
+        return card;
+      }
+
+      function createFeaturedCard(item) {
+        const card = document.createElement('div');
+        card.className = 'featured-card';
+        card.dataset.id = item.id;
+
+        // Check if item is in My List
+        const isInList = myList.some(listItem => listItem.id === item.id);
+        const listIcon = isInList ? 'fa-check' : 'fa-plus';
+
+        const tagClass = item.tag?.toLowerCase().includes('original') ? 'top' : item.tag?.toLowerCase().includes('new') ? 'new' : '';
+
+        card.innerHTML = `
+          <img src="${item.image}" alt="${item.title}" class="featured-img">
+          <div class="featured-content">
+            ${item.tag ? `<span class="featured-tag ${tagClass}">${item.tag}</span>` : ''}
+            <h3 class="featured-card-title">${item.title}</h3>
+            <p class="featured-card-desc">${item.description || 'A Netflix Original production that you will love.'}</p>
+            <div class="featured-meta">
+              <div class="featured-meta-left">
+                <span class="featured-rating">${item.rating}% Match</span>
+                <span class="featured-age">${item.age}</span>
+              </div>
+              <span class="featured-length">${item.duration}</span>
+            </div>
+            <button class="btn btn-primary" style="margin-top: 15px;" onclick="openModal(${item.id})">
+              <i class="fas fa-play"></i> Watch Now
+            </button>
+            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="toggleMyList(${item.id}, event)">
+              <i class="fas fa-${listIcon}"></i> My List
+            </button>
+          </div>
+        `;
+
+        return card;
+      }
+
+      // ===== Event Listeners =====
+      function setupEventListeners() {
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+          if (window.scrollY > 50) {
+            header.classList.add('scrolled');
+          } else {
+            header.classList.remove('scrolled');
+          }
+        });
+
+        // Modal close
+        modalClose.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            closeModal();
+          }
+        });
+
+        // Keyboard close
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && modal.classList.contains('active')) {
+            closeModal();
+          }
+        });
+
+        // Play button
+        playBtn.addEventListener('click', () => {
+          const featuredItem = sampleContent.netflixOriginals[0];
+          openModal(featuredItem.id);
+        });
+
+        // More Info button
+        moreInfoBtn.addEventListener('click', () => {
+          const featuredItem = sampleContent.netflixOriginals[0];
+          showModalInfo(featuredItem);
+        });
+
+        // Search
+        searchInput.addEventListener('input', (e) => {
+          const query = e.target.value.toLowerCase();
+          if (query.length > 0) {
+            // Filter all content
+            const allContent = Object.values(sampleContent).flat();
+            const results = allContent.filter(item => 
+              item.title.toLowerCase().includes(query) ||
+              item.genres.some(g => g.toLowerCase().includes(query))
+            );
+            // Show results in notification
+            showNotification(`${results.length} results found for "${query}"`);
+          }
+        });
+
+        // Profile dropdown
+        profileDropdown.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dropdownMenu.classList.toggle('active');
+        });
+
+        document.addEventListener('click', () => {
+          dropdownMenu.classList.remove('active');
+        });
+
+        // Sign out
+        signOut.addEventListener('click', () => {
+          showNotification('Signed out successfully', 'success');
+          // In a real app, you would redirect to login page
+        });
+      }
+
+      // ===== Modal Functions =====
+      function openModal(id) {
+        const allContent = Object.values(sampleContent).flat();
+        const item = allContent.find(i => i.id === id);
+        if (item) {
+          showModalInfo(item);
+          modal.classList.add('active');
+          document.body.style.overflow = 'hidden';
+        }
+      }
+
+      function closeModal() {
+        modal.classList.remove('active');
+        modalVideo.innerHTML = '';
+        document.body.style.overflow = '';
+      }
+
+      function showModalInfo(item) {
+        modalTitle.textContent = item.title;
+        modalRating.textContent = `${item.rating}% Match`;
+        modalYear.textContent = item.year;
+        modalAge.textContent = item.age;
+        modalLength.textContent = item.duration;
+        modalGenre.innerHTML = item.genres.map(g => `<span>${g}</span>`).join('');
+        modalDescription.textContent = item.description || 'No description available.';
+
+        // Update episode info if it's a TV show
+        if (item.type === 'tv') {
+          modalEpisode.innerHTML = `
+            <span class="episode-number">Season 1, Episode 1</span>
+            <span class="episode-title">Pilot</span>
+          `;
+          modalEpisode.style.display = 'flex';
+        } else {
+          modalEpisode.style.display = 'none';
+        }
+
+        // Add video or placeholder
+        modalVideo.innerHTML = `
+          <video controls autoplay>
+            <source src="" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          <div style="position: absolute; color: #fff; text-align: center; padding: 20px;">
+            <h3>Video Preview</h3>
+            <p>${item.title}</p>
+            <p style="margin-top: 10px;">Trailer coming soon...</p>
+          </div>
+        `;
+      }
+
+      // ===== My List Functions =====
+      function toggleMyList(id, event) {
+        event.stopPropagation();
+        const allContent = Object.values(sampleContent).flat();
+        const item = allContent.find(i => i.id === id);
+        if (!item) return;
+
+        const index = myList.findIndex(listItem => listItem.id === id);
+        if (index > -1) {
+          myList.splice(index, 1);
+          showNotification('Removed from My List', 'error');
+        } else {
+          myList.push(item);
+          showNotification('Added to My List', 'success');
+        }
+
+        updateMyList();
+        updateAllCards();
+      }
+
+      function updateMyList() {
+        localStorage.setItem('myList', JSON.stringify(myList));
+      }
+
+      function updateAllCards() {
+        const cards = document.querySelectorAll('.card, .featured-card');
+        cards.forEach(card => {
+          const id = parseInt(card.dataset.id);
+          const isInList = myList.some(item => item.id === id);
+          const listToggle = card.querySelector('.list-toggle');
+          if (listToggle) {
+            listToggle.classList.toggle('active', isInList);
+            listToggle.innerHTML = `<i class="fas ${isInList ? 'fa-check' : 'fa-plus'}"></i>`;
+          }
+        });
+      }
+
+      // ===== Hero Functions =====
+      function updateHero() {
+        // Rotate hero content periodically
+        const featuredItems = sampleContent.netflixOriginals.slice(0, 5);
+        let currentIndex = 0;
+
+        setInterval(() => {
+          currentIndex = (currentIndex + 1) % featuredItems.length;
+          const item = featuredItems[currentIndex];
+          heroTitle.textContent = item.title;
+          heroDescription.textContent = item.description || 'A Netflix Original production that you will love.';
+          hero.style.backgroundImage = `linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(20, 20, 20, 0.8)), url('${item.image}')`;
+        }, 10000);
+      }
+
+      // ===== Utility Functions =====
+      function scrollRow(carouselId, scrollAmount) {
+        const carousel = document.getElementById(carouselId);
+        carousel.scrollBy({
+          left: scrollAmount,
+          behavior: 'smooth'
+        });
+      }
+
+      function showNotification(message, type = '') {
+        notificationText.textContent = message;
+        notification.className = `notification ${type} active`;
+        setTimeout(() => {
+          notification.classList.remove('active');
+        }, 3000);
+      }
+
+      // ===== Touch Support for Carousels =====
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      document.querySelectorAll('.row-carousel').forEach(carousel => {
+        carousel.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        carousel.addEventListener('touchend', (e) => {
+          touchEndX = e.changedTouches[0].screenX;
+          handleSwipe(carousel, touchStartX, touchEndX);
+        }, { passive: true });
+      });
+
+      function handleSwipe(carousel, startX, endX) {
+        const threshold = 50;
+        const diff = startX - endX;
+
+        if (Math.abs(diff) > threshold) {
+          if (diff > 0) {
+            // Swipe left
+            carousel.scrollBy({ left: 300, behavior: 'smooth' });
+          } else {
+            // Swipe right
+            carousel.scrollBy({ left: -300, behavior: 'smooth' });
+          }
+        }
+      }
+
+      // ===== Infinite Scroll for Featured =====
+      const featuredCarousel = document.getElementById('netflix-originals-carousel');
+      if (featuredCarousel) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        featuredCarousel.addEventListener('mousedown', (e) => {
+          isDown = true;
+          startX = e.pageX - featuredCarousel.offsetLeft;
+          scrollLeft = featuredCarousel.scrollLeft;
+        });
+
+        featuredCarousel.addEventListener('mouseleave', () => {
+          isDown = false;
+        });
+
+        featuredCarousel.addEventListener('mouseup', () => {
+          isDown = false;
+        });
+
+        featuredCarousel.addEventListener('mousemove', (e) => {
+          if (!isDown) return;
+          e.preventDefault();
+          const x = e.pageX - featuredCarousel.offsetLeft;
+          const walk = (x - startX) * 2;
+          featuredCarousel.scrollLeft = scrollLeft - walk;
+        });
+      }
+
+      // ===== Autoplay Videos (Optional) =====
+      // This would require actual video sources
+      // For demo purposes, we'll just show a placeholder
+    </script>
+  </body>
+</html>

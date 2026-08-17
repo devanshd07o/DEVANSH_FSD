@@ -1,0 +1,10 @@
+[
+  {
+    "key": "F9",
+    "command": "workbench.action.terminal.sendSequence",
+    "args": {
+      "text": "node ${file}\u000D"
+    },
+    "when": "editorTextFocus && !editorReadonly"
+  }
+]
