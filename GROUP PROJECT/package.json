@@ -1,0 +1,13 @@
+{
+  "name": "college-admission-portal",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node server/scripts/dev.mjs",
+    "build": "npm --prefix client install --include=dev && npm --prefix client run build && npm --prefix server install --include=dev && npm --prefix server run db:generate",
+    "start": "npm --prefix server run start",
+    "render:start": "npm --prefix server run db:push && npm --prefix server run db:seed-if-empty && npm --prefix server run start",
+    "test": "npm --prefix server test",
+    "db:seed": "npm --prefix server run db:seed"
+  }
+}

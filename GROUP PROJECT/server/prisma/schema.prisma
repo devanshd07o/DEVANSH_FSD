@@ -1,0 +1,565 @@
+// Prisma Schema for Antigravity College Admission Automation Portal
+// Authoritative spec: C:\Users\devan\Downloads\ANTIGRAVITY_ADMISSION_PORTAL_MASTER_SPEC.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// -------------------------------------------------------------
+// 1. IDENTITY & INSTITUTION
+// -------------------------------------------------------------
+
+model Institution {
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
+  timezone     String        @default("Asia/Kolkata")
+  settingsJson String        @default("{}")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  academicYears AcademicYear[]
+  programs      Program[]
+  userRoles     UserRole[]
+  applications  Application[]
+  enrollments   Enrollment[]
+  feeSchedules  FeeSchedule[]
+}
+
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  phone           String?
+  name            String
+  passwordHash    String
+  isActive        Boolean       @default(true)
+  emailVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  userRoles       UserRole[]
+  profile         ApplicantProfile?
+  applications    Application[]
+  scrutinyReviews ScrutinyReview[]
+  assignments     ScrutinyAssignment[]
+  enrollments     Enrollment[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  code        String           @unique // APPLICANT, REVIEWER, ADMISSIONS_OFFICER, ACCOUNTS, REGISTRAR, SUPER_ADMIN
+  displayName String
+  isSystem    Boolean          @default(true)
+  permissions RolePermission[]
+  userRoles   UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  code        String           @unique
+  description String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id            String       @id @default(uuid())
+  userId        String
+  roleId        String
+  institutionId String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  institution   Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId, institutionId])
+}
+
+// -------------------------------------------------------------
+// 2. ADMISSION CONFIGURATION & PROGRAMS
+// -------------------------------------------------------------
+
+model AcademicYear {
+  id            String         @id @default(uuid())
+  institutionId String
+  code          String // e.g. "2026-2027"
+  startDate     DateTime
+  endDate       DateTime
+  status        String         @default("OPEN") // DRAFT, OPEN, CLOSED, ARCHIVED
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  tracks        AdmissionTrack[]
+  applications  Application[]
+  enrollments   Enrollment[]
+
+  @@unique([institutionId, code])
+}
+
+model Program {
+  id            String         @id @default(uuid())
+  institutionId String
+  code          String // e.g. "BTECH-CSE"
+  name          String // "B.Tech Computer Science & Engineering"
+  degree        String // "UG", "PG"
+  department    String
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+
+  institution   Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  tracks        AdmissionTrack[]
+  seatPools     SeatPool[]
+  enrollments   Enrollment[]
+
+  @@unique([institutionId, code])
+}
+
+model AdmissionTrack {
+  id             String          @id @default(uuid())
+  academicYearId String
+  programId      String
+  code           String // "BTECH-CSE-2026-REGULAR"
+  name           String
+  appFeePaise    Int             @default(100000) // ₹1,000.00
+  createdAt      DateTime        @default(now())
+
+  academicYear   AcademicYear    @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  windows        AdmissionWindow[]
+  rounds         AdmissionRound[]
+  requiredDocs   RequiredDocumentType[]
+  applications   Application[]
+}
+
+model AdmissionWindow {
+  id               String         @id @default(uuid())
+  admissionTrackId String
+  openDate         DateTime
+  closeDate        DateTime
+  correctionDueDays Int           @default(3)
+  isPublished      Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+
+  admissionTrack   AdmissionTrack @relation(fields: [admissionTrackId], references: [id], onDelete: Cascade)
+}
+
+model ReservationCategory {
+  id          String   @id @default(uuid())
+  code        String   @unique // "GENERAL", "OBC", "SC", "ST", "EWS"
+  label       String
+  percentage  Float
+  proofDoc    String?  // Name of required certificate
+  isActive    Boolean  @default(true)
+
+  seatPools   SeatPool[]
+}
+
+model SeatPool {
+  id           String              @id @default(uuid())
+  programId    String
+  categoryId   String
+  capacity     Int
+  heldCount    Int                 @default(0)
+  confirmedCount Int               @default(0)
+  version      Int                 @default(1)
+
+  program      Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  category     ReservationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  offers       AllotmentOffer[]
+
+  @@unique([programId, categoryId])
+}
+
+model AdmissionRound {
+  id               String          @id @default(uuid())
+  admissionTrackId String
+  roundNumber      Int
+  status           String          @default("PLANNED") // PLANNED, PREVIEWED, PUBLISHED, CLOSED
+  offerAcceptDays  Int             @default(3)
+  publishedAt      DateTime?
+  createdAt        DateTime        @default(now())
+
+  admissionTrack   AdmissionTrack  @relation(fields: [admissionTrackId], references: [id], onDelete: Cascade)
+  meritRuns        MeritRun[]
+  allocationRuns   SeatAllocationRun[]
+  offers           AllotmentOffer[]
+}
+
+model FeeSchedule {
+  id            String      @id @default(uuid())
+  institutionId String
+  name          String      // "Annual Tuition Fee B.Tech"
+  categoryCode  String      // "ALL" or "SC/ST"
+  amountPaise   Int         // e.g. 7500000 = ₹75,000.00
+  currency      String      @default("INR")
+  effectiveFrom DateTime
+  effectiveTo   DateTime
+
+  institution   Institution @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+}
+
+model RequiredDocumentType {
+  id               String         @id @default(uuid())
+  admissionTrackId String
+  code             String         // "CLASS_10_MARKSHEET", "CLASS_12_MARKSHEET", "CATEGORY_CERTIFICATE", "PHOTO"
+  label            String
+  acceptedMime     String         // "application/pdf,image/jpeg,image/png"
+  maxBytes         Int            @default(5242880) // 5MB
+  isRequired       Boolean        @default(true)
+
+  admissionTrack   AdmissionTrack @relation(fields: [admissionTrackId], references: [id], onDelete: Cascade)
+  documents        Document[]
+}
+
+// -------------------------------------------------------------
+// 3. STUDENT APPLICATION & PROFILE
+// -------------------------------------------------------------
+
+model ApplicantProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  dob         DateTime
+  gender      String
+  fatherName  String
+  motherName  String
+  address     String
+  city        String
+  state       String
+  pincode     String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id                String                @id @default(uuid())
+  applicationNumber String                @unique // Human readable: "AIET-2026-0001"
+  applicantId       String
+  institutionId     String
+  academicYearId    String
+  admissionTrackId  String
+  status            String                @default("DRAFT") // DRAFT, SUBMITTED, UNDER_REVIEW, CORRECTION_REQUIRED, RESUBMITTED, VERIFIED, REJECTED, WITHDRAWN
+  currentRevisionNo Int                   @default(1)
+  submittedAt       DateTime?
+  version           Int                   @default(1) // Optimistic lock
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  applicant         User                  @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  institution       Institution           @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicYear      AcademicYear          @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  admissionTrack    AdmissionTrack        @relation(fields: [admissionTrackId], references: [id], onDelete: Cascade)
+
+  revisions         ApplicationRevision[]
+  documents         Document[]
+  defects           Defect[]
+  scrutinyReviews   ScrutinyReview[]
+  assignments       ScrutinyAssignment[]
+  meritEntries      MeritEntry[]
+  offers            AllotmentOffer[]
+  payments          PaymentOrder[]
+  enrollment        Enrollment?
+  auditLogs         AuditLog[]
+
+  @@unique([academicYearId, applicationNumber])
+}
+
+model ApplicationRevision {
+  id            String            @id @default(uuid())
+  applicationId String
+  revisionNo    Int
+  snapshotJson  String            // Full JSON snapshot of form data at time of submission
+  changeSummary String?
+  isFrozen      Boolean           @default(false)
+  submittedAt   DateTime          @default(now())
+
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  records       AcademicRecord[]
+  claims        CategoryClaim[]
+
+  @@unique([applicationId, revisionNo])
+}
+
+model AcademicRecord {
+  id             String              @id @default(uuid())
+  revisionId     String
+  examName       String              // "10th Standard", "12th Standard"
+  boardUniversity String             // "CBSE", "ICSE", "State Board"
+  passingYear    Int
+  rollNumber     String
+  maxMarks       Float
+  obtainedMarks  Float
+  percentage     Float
+
+  revision       ApplicationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+}
+
+model CategoryClaim {
+  id             String              @id @default(uuid())
+  revisionId     String
+  categoryCode   String              // "GENERAL", "OBC", "SC", "ST", "EWS"
+  certificateNo  String?
+  issuingAuthority String?
+  verificationStatus String          @default("PENDING") // PENDING, VERIFIED, REJECTED
+
+  revision       ApplicationRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id            String               @id @default(uuid())
+  applicationId String
+  documentTypeId String
+  originalName  String
+  storageKey    String               // Private path in storage
+  byteSize      Int
+  mimeType      String
+  checksumSha256 String
+  uploadStatus  String               @default("READY") // PENDING, SCANNING, READY, QUARANTINED
+  isCurrent     Boolean              @default(true)
+  uploadedAt    DateTime             @default(now())
+
+  application   Application          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentType  RequiredDocumentType @relation(fields: [documentTypeId], references: [id], onDelete: Cascade)
+  defects       Defect[]
+}
+
+// -------------------------------------------------------------
+// 4. SCRUTINY & DEFECT RESOLUTION
+// -------------------------------------------------------------
+
+model ScrutinyAssignment {
+  id            String      @id @default(uuid())
+  applicationId String
+  reviewerId    String
+  status        String      @default("ACTIVE") // ACTIVE, COMPLETED, RELEASED
+  assignedAt    DateTime    @default(now())
+  releasedAt    DateTime?
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer      User        @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+}
+
+model ScrutinyReview {
+  id            String      @id @default(uuid())
+  applicationId String
+  reviewerId    String
+  revisionNo    Int
+  decision      String      // APPROVED, CORRECTION_REQUESTED, ESCALATED, RECOMMEND_REJECTION
+  reviewerNotes String?
+  completedAt   DateTime    @default(now())
+
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer      User        @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  defects       Defect[]
+}
+
+model Defect {
+  id            String          @id @default(uuid())
+  applicationId String
+  reviewId      String
+  documentId    String?
+  fieldPath     String?         // e.g. "academicRecords.12th" or "categoryClaim"
+  reasonCode    String          // "BLURRED_DOCUMENT", "INVALID_DATE", "MARKS_MISMATCH", "EXPIRED_CERTIFICATE"
+  studentComment String         // Actionable student instruction
+  internalNote  String?
+  status        String          @default("OPEN") // OPEN, FIXED, WAIVED
+  dueAt         DateTime
+  resolvedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  review        ScrutinyReview  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  document      Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+}
+
+// -------------------------------------------------------------
+// 5. MERIT, ALLOCATION & CONCURRENCY
+// -------------------------------------------------------------
+
+model MeritRun {
+  id               String          @id @default(uuid())
+  admissionRoundId String
+  algorithmVersion String          @default("1.0.0")
+  inputHash        String
+  status           String          @default("DRAFT") // DRAFT, APPROVED, PUBLISHED
+  publishedAt      DateTime?
+  createdAt        DateTime        @default(now())
+
+  admissionRound   AdmissionRound  @relation(fields: [admissionRoundId], references: [id], onDelete: Cascade)
+  entries          MeritEntry[]
+}
+
+model MeritEntry {
+  id            String      @id @default(uuid())
+  meritRunId    String
+  applicationId String
+  score         Float
+  rank          Int
+  categoryRank  Int
+  categoryCode  String
+  explanation   String      // JSON breakdown of tie breakers and components
+
+  meritRun      MeritRun    @relation(fields: [meritRunId], references: [id], onDelete: Cascade)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([meritRunId, applicationId])
+}
+
+model SeatAllocationRun {
+  id               String         @id @default(uuid())
+  admissionRoundId String
+  status           String         @default("PREVIEW") // PREVIEW, APPROVED, PUBLISHED
+  publishedAt      DateTime?
+  createdAt        DateTime       @default(now())
+
+  admissionRound   AdmissionRound @relation(fields: [admissionRoundId], references: [id], onDelete: Cascade)
+  offers           AllotmentOffer[]
+}
+
+model AllotmentOffer {
+  id            String             @id @default(uuid())
+  allocationId  String
+  roundId       String
+  applicationId String
+  seatPoolId    String
+  programName   String
+  categoryCode  String
+  status        String             @default("OFFERED") // OFFERED, ACCEPTED, PAYMENT_PENDING, CONFIRMED, DECLINED, EXPIRED
+  offerIssuedAt DateTime           @default(now())
+  acceptBy      DateTime
+  payBy         DateTime
+  version       Int                @default(1)
+
+  allocation    SeatAllocationRun  @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+  round         AdmissionRound     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  application   Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  seatPool      SeatPool           @relation(fields: [seatPoolId], references: [id], onDelete: Cascade)
+  payments      PaymentOrder[]
+  enrollment    Enrollment?
+}
+
+// -------------------------------------------------------------
+// 6. PAYMENTS, ENROLLMENT & DOCUMENTS
+// -------------------------------------------------------------
+
+model PaymentOrder {
+  id              String               @id @default(uuid())
+  applicationId   String
+  offerId         String?
+  feeType         String               // "APPLICATION_FEE", "ADMISSION_FEE"
+  amountPaise     Int
+  currency        String               @default("INR")
+  status          String               @default("CREATED") // CREATED, PENDING, PAID, FAILED, EXPIRED
+  provider        String               @default("mock")    // "mock", "razorpay"
+  providerOrderId String?              @unique
+  paidAt          DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  application     Application          @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offer           AllotmentOffer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  transactions    PaymentTransaction[]
+}
+
+model PaymentTransaction {
+  id            String       @id @default(uuid())
+  paymentOrderId String
+  gatewayPaymentId String    @unique
+  amountPaise   Int
+  status        String       // "CAPTURED", "FAILED"
+  capturedAt    DateTime     @default(now())
+  rawResponse   String?
+
+  paymentOrder  PaymentOrder @relation(fields: [paymentOrderId], references: [id], onDelete: Cascade)
+}
+
+model PaymentWebhookEvent {
+  id              String    @id @default(uuid())
+  provider        String    // "mock", "razorpay"
+  providerEventId String    // unique per provider
+  signatureStatus String    // "VERIFIED", "INVALID"
+  payloadJson     String
+  processedAt     DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+
+  @@unique([provider, providerEventId])
+}
+
+model Enrollment {
+  id               String         @id @default(uuid())
+  enrollmentNumber String         @unique // e.g. "AIET/2026/CSE/0042"
+  applicationId    String         @unique
+  offerId          String         @unique
+  userId           String
+  institutionId    String
+  academicYearId   String
+  programId        String
+  issuedAt         DateTime       @default(now())
+  status           String         @default("ACTIVE") // ACTIVE, CANCELLED, WITHDRAWN
+
+  application      Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offer            AllotmentOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  institution      Institution    @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  academicYear     AcademicYear   @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+  program          Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  documents        GeneratedDocument[]
+}
+
+model GeneratedDocument {
+  id              String      @id @default(uuid())
+  enrollmentId    String
+  documentType    String      // "ADMISSION_CONFIRMATION", "FEE_RECEIPT", "ALLOTMENT_LETTER"
+  documentNumber  String      @unique
+  storageKey      String
+  verificationToken String    @unique // Opaque hash for QR verification
+  issuedAt        DateTime    @default(now())
+
+  enrollment      Enrollment  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------------------------------------
+// 7. AUDIT & NOTIFICATIONS
+// -------------------------------------------------------------
+
+model AuditLog {
+  id            String       @id @default(uuid())
+  actorId       String?
+  action        String       // "APPLICATION_SUBMITTED", "DEFECT_RAISED", "SEAT_ALLOTTED", "PAYMENT_VERIFIED", "ENROLLMENT_ISSUED"
+  entityType    String       // "Application", "ScrutinyReview", "AllotmentOffer", "PaymentOrder"
+  entityId      String
+  beforeState   String?      // Redacted JSON
+  afterState    String?      // Redacted JSON
+  ipAddress     String?
+  timestamp     DateTime     @default(now())
+
+  actor         User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  applicationId String?
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  userId      String
+  title       String
+  message     String
+  linkUrl     String?
+  isRead      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

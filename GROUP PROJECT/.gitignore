@@ -1,0 +1,11 @@
+node_modules/
+client/node_modules/
+client/dist/
+server/node_modules/
+server/.env
+server/*.db
+server/*.db-*
+server/tests/.test.db*
+server/data/uploads/
+.DS_Store
+Thumbs.db
